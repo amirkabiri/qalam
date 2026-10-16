@@ -215,6 +215,34 @@ describe('<SelectionToolbar />', () => {
     expect(bar.style.top).toBe('35px');
   });
 
+  it('shows Bold as ACTIVE (aria-pressed) when the selection is inside bold markers, and Bold then UNWRAPS', async () => {
+    render(<Harness />);
+    act(() => controller().loadDocument('a **bold** b'));
+    stubExecCommand();
+
+    // Selection strictly INSIDE the **…** span (a re-selection of the
+    // already-bold word — t_d18b34b2).
+    await openToolbar(4, 8);
+
+    expect(button('Bold')).toHaveAttribute('aria-pressed', 'true');
+    expect(button('Bold')).toHaveAttribute('data-active');
+    expect(button('Italic')).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.setup().click(button('Bold'));
+    // Toggled OFF — no double **…** wrapping.
+    expect(textarea().value).toBe('a bold b');
+  });
+
+  it('a plain selection renders every button aria-pressed=false', async () => {
+    render(<Harness />);
+    act(() => controller().loadDocument('hello world'));
+
+    await openToolbar();
+
+    expect(button('Bold')).toHaveAttribute('aria-pressed', 'false');
+    expect(button('Blockquote')).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('applies Bold through the controller: undo-path write, one change event, focus kept', async () => {
     const onDocChange = vi.fn();
     render(<Harness onDocChange={onDocChange} />);

@@ -213,12 +213,24 @@ export function useEditorController(opts: EditorControllerOptions = {}): EditorC
     const [a, b] = range
       ? clampRange(range[0], range[1], len)
       : clampRange(el.selectionStart ?? 0, el.selectionEnd ?? 0, len);
-    // applyAction returns the FULL new document; the write primitive wants
-    // just the [a, b) segment — everything between the unchanged edges.
-    const after = el.value.slice(b);
-    const result = applyAction(el.value, a, b, action);
-    const inserted = result.text.slice(a, result.text.length - after.length);
-    writeRange(el, a, b, inserted, result.selStart, result.selEnd);
+    // Toggle actions may rewrite marker characters OUTSIDE [a, b) — a bold
+    // UNWRAP removes the **…** pair hugging (or enclosing) the selection —
+    // so the write region is the DIFF of the common prefix/suffix edges,
+    // not [a, b) itself. Still exactly one write, one native undo step.
+    const before = el.value;
+    const result = applyAction(before, a, b, action);
+    const minLen = Math.min(before.length, result.text.length);
+    let start = 0;
+    while (start < minLen && before[start] === result.text[start]) start += 1;
+    let end = 0;
+    while (
+      end < minLen - start
+      && before[before.length - 1 - end] === result.text[result.text.length - 1 - end]
+    ) {
+      end += 1;
+    }
+    const inserted = result.text.slice(start, result.text.length - end);
+    writeRange(el, start, before.length - end, inserted, result.selStart, result.selEnd);
     textRef.current = el.value;
     setText(el.value); // preview/counts/autosave stay live, exactly like an edit
     notifyDocChange(el.value);

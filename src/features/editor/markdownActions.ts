@@ -112,11 +112,6 @@ function usableRun(ch: string, need: number, len: number): boolean {
   return true;
 }
 
-/** `_` runs must sit on word boundaries (intraword `_foo_` is literal). */
-function boundaryOk(text: string, ch: string, outside: number): boolean {
-  return ch !== '_' || !WORD_CHAR_RE.test(text[outside] ?? '');
-}
-
 /** Enclosing paragraph bounds [start, end): emphasis cannot cross a blank
  *  line, so the marker scan never needs to leave it. */
 function paraBounds(text: string, lo: number, hi: number): [number, number] {
@@ -125,41 +120,18 @@ function paraBounds(text: string, lo: number, hi: number): [number, number] {
   return [start === -1 ? 0 : start + 2, end === -1 ? text.length : end];
 }
 
-/** Every usable marker-character run in [p0, p1), left to right. */
+/** Every usable marker-character run in [p0, p1), left to right (length /
+ *  parity rules only — positional `_` flanks are checked at pairing). */
 function usableRuns(text: string, p0: number, p1: number, ch: string, need: number): MarkerRun[] {
-  const runs: MarkerRun[] = [];
-  let i = p0;
-  while (i < p1) {
-    if (text[i] === ch) {
-      let e = i;
-      while (e + 1 < p1 && text[e + 1] === ch) e += 1;
-      if (
-        usableRun(ch, need, e + 1 - i)
-        && boundaryOk(text, ch, i - 1)
-        && boundaryOk(text, ch, e + 1)
-      ) {
-        runs.push({ start: i, end: e + 1 });
-      }
-      i = e + 1;
-      continue;
-    }
-    i += 1;
+  const re = new RegExp(`${ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}+`, 'g');
+  re.lastIndex = p0;
+  const spans: MarkerRun[] = [];
+  let m = re.exec(text);
+  while (m && m.index < p1) {
+    if (m.index >= p0) spans.push({ start: m.index, end: m.index + m[0].length });
+    m = re.exec(text);
   }
-  return runs;
-}
-
-/** Sequential (opener/closer) pairing of the usable runs. */
-function markerPairs(runs: MarkerRun[]): MarkerPair[] {
-  const pairs: MarkerPair[] = [];
-  for (let k = 0; k + 1 < runs.length; k += 2) {
-    pairs.push({
-      openStart: runs[k].start,
-      openEnd: runs[k].end,
-      closeStart: runs[k + 1].start,
-      closeEnd: runs[k + 1].end,
-    });
-  }
-  return pairs;
+  return spans.filter((run) => usableRun(ch, need, run.end - run.start));
 }
 
 function pairsInParagraph(
@@ -170,10 +142,34 @@ function pairsInParagraph(
   need: number,
 ): MarkerPair[] {
   const [p0, p1] = paraBounds(text, lo, hi);
-  const pairs = markerPairs(usableRuns(text, p0, p1, ch, need));
-  // A pair with a blank inner span is not emphasis (two adjacent `*a* *b*`
-  // runs must not read as a pair around the space between them).
-  return pairs.filter((p) => text.slice(p.openEnd, p.closeStart).trim() !== '');
+  const runs = usableRuns(text, p0, p1, ch, need);
+  const pairs: MarkerPair[] = [];
+  // Sequential (opener/closer) pairing of the usable runs: each even-indexed
+  // run opens, the next one closes it.
+  runs.forEach((open, k) => {
+    if (k % 2 === 1) return; // a closer — handled with its opener
+    const close = runs[k + 1];
+    if (!close) return;
+    // `_` emphasis needs word-boundary flanks: nothing wordly outside the
+    // opener's left edge or the closer's right edge (intraword `_foo_` in
+    // `foo_bar_baz` is literal — its flanks ARE word characters).
+    if (
+      ch === '_'
+      && (WORD_CHAR_RE.test(text[open.start - 1] ?? '') || WORD_CHAR_RE.test(text[close.end] ?? ''))
+    ) {
+      return;
+    }
+    // A pair with a blank inner span is not emphasis (two adjacent `*a* *b*`
+    // runs must not read as a pair around the space between them).
+    if (text.slice(open.end, close.start).trim() === '') return;
+    pairs.push({
+      openStart: open.start,
+      openEnd: open.end,
+      closeStart: close.start,
+      closeEnd: close.end,
+    });
+  });
+  return pairs;
 }
 
 /** The innermost matched emphasis pair whose span CONTAINS the whole
@@ -187,13 +183,13 @@ function findEnclosingPair(
 ): MarkerPair | null {
   if (lo === hi) return null;
   let best: MarkerPair | null = null;
-  for (const pair of pairsInParagraph(text, lo, hi, ch, need)) {
+  pairsInParagraph(text, lo, hi, ch, need).forEach((pair) => {
     if (pair.openEnd <= lo && pair.closeStart >= hi) {
       if (!best || pair.closeStart - pair.openEnd < best.closeStart - best.openEnd) {
         best = pair;
       }
     }
-  }
+  });
   return best;
 }
 
@@ -214,7 +210,13 @@ function overlappingPairs(
 
 /** Remove a pair's markers: `need` chars off each run's INNER edge (a `***`
  *  run loses only two stars — the italic layer stays). */
-function unwrapPair(text: string, lo: number, hi: number, pair: MarkerPair, need: number): FormatResult {
+function unwrapPair(
+  text: string,
+  lo: number,
+  hi: number,
+  pair: MarkerPair,
+  need: number,
+): FormatResult {
   const cut = (s: string, from: number, to: number) => s.slice(0, from) + s.slice(to);
   const withoutClose = cut(text, pair.closeStart, pair.closeStart + need);
   const withoutOpen = cut(withoutClose, pair.openEnd - need, pair.openEnd);
@@ -249,9 +251,10 @@ function wrapRange(text: string, lo: number, hi: number, marker: string): Format
  * The toggle wrap (research §3.3, extended by t_d18b34b2):
  *   1. ENCLOSED — the selection sits entirely inside an existing emphasis
  *      span (markers immediately hugging it is the adjacent case) → unwrap;
- *   2. strip-from-selection — the selection itself is fully wrapped → strip;
- *   3. UNIFY — the selection overlaps spans without being enclosed (it is
- *      PARTIALLY bold) → strip those spans and wrap the union;
+ *   2. UNIFY — the selection overlaps spans without being a single pure
+ *      `marker…marker` wrapper (it is PARTIALLY bold) → strip those spans
+ *      and wrap the union;
+ *   3. strip-from-selection — the selection IS a pure wrapped span → strip;
  *   4. wrap — otherwise insert a fresh marker pair.
  */
 function toggleWrap(text: string, lo: number, hi: number, marker: string): FormatResult {
@@ -262,38 +265,58 @@ function toggleWrap(text: string, lo: number, hi: number, marker: string): Forma
   const enclosing = findEnclosingPair(text, lo, hi, ch, n);
   if (enclosing) return unwrapPair(text, lo, hi, enclosing, n);
   const selected = text.slice(lo, hi);
-  // 2. Strip-from-selection: the selection itself is fully wrapped.
-  if (selected.length >= 2 * n && selected.startsWith(marker) && selected.endsWith(marker)) {
-    const inner = selected.slice(n, selected.length - n);
-    return {
-      text: text.slice(0, lo) + inner + text.slice(hi),
-      selStart: lo,
-      selEnd: lo + inner.length,
-    };
-  }
-  // 3. Partial overlap → unify: strip every overlapping span's markers, then
+  const fullyWrapped = selected.length >= 2 * n
+    && selected.startsWith(marker)
+    && selected.endsWith(marker);
+  // A pure wrapper (e.g. the user grabbed the whole `**bold**`) strips —
+  // but a MIXED selection (`**aa** bb **cc**` — its interior still carries
+  // marker runs) must unify or strip pairs instead of stripping the outer
+  // markers into broken markdown.
+  const inner = fullyWrapped ? selected.slice(n, selected.length - n) : '';
+  const pureWrapper = fullyWrapped && usableRuns(inner, 0, inner.length, ch, n).length === 0;
+  // 2. Partial overlap → unify: strip every overlapping span's markers, then
   //    wrap the union extent (e.g. `**bo**ld` + bold → `**bold**`).
   const overlap = overlappingPairs(text, lo, hi, ch, n);
-  if (overlap.length > 0) {
+  if (overlap.length > 0 && !pureWrapper) {
     let unionLo = lo;
     let unionHi = hi;
-    for (const p of overlap) {
+    overlap.forEach((p) => {
       unionLo = Math.min(unionLo, p.openStart);
       unionHi = Math.max(unionHi, p.closeEnd);
-    }
-    const cuts: [number, number][] = [];
-    for (const p of overlap) {
-      cuts.push([p.openEnd - n, p.openEnd], [p.closeStart - n, p.closeEnd]);
-    }
+    });
+    const cuts: [number, number][] = overlap.flatMap((p) => [
+      [p.openEnd - n, p.openEnd],
+      [p.closeStart, p.closeStart + n],
+    ]);
     cuts.sort((a, b) => b[0] - a[0]);
     let next = text;
-    for (const [from, to] of cuts) next = next.slice(0, from) + next.slice(to);
+    cuts.forEach(([from, to]) => {
+      next = next.slice(0, from) + next.slice(to);
+    });
     // Removed characters left of a position shift it by their total length.
     const shift = (pos: number) => cuts.reduce(
       (acc, [from, to]) => (to <= pos ? acc + (to - from) : acc),
       0,
     );
-    return wrapRange(next, unionLo - shift(unionLo), unionHi - shift(unionHi), marker);
+    if (!text.slice(unionLo, unionHi).includes('\n\n')) {
+      return wrapRange(next, unionLo - shift(unionLo), unionHi - shift(unionHi), marker);
+    }
+    // The union crosses a blank line, where a wrap would not render as
+    // emphasis: for a fully-wrapped selection just strip the pairs off
+    // (no rewrap); anything else falls through to the plain wrap.
+    if (fullyWrapped) {
+      return { text: next, selStart: lo - shift(lo), selEnd: hi - shift(hi) };
+    }
+  }
+  // 3. Strip-from-selection: a fully-wrapped selection strips its outer
+  //    markers — pure wrappers toggling off, and the blank-line-crossing
+  //    selections unify declined above (old behavior preserved there).
+  if (fullyWrapped) {
+    return {
+      text: text.slice(0, lo) + inner + text.slice(hi),
+      selStart: lo,
+      selEnd: lo + inner.length,
+    };
   }
   // 4. Plain wrap.
   return wrapRange(text, lo, hi, marker);
@@ -489,6 +512,12 @@ export function applyAction(
     // Inline code on a multi-line selection becomes a fenced block instead.
     if (action === 'inlineCode' && text.slice(lo, hi).includes('\n')) {
       return toggleCodeBlock(text, lo, hi);
+    }
+    // Italic's alternate marker: an enclosing `_raw_` span toggles off too
+    // (the `*` scan below cannot see underscore runs).
+    if (action === 'italic') {
+      const underscore = findEnclosingPair(text, lo, hi, '_', 1);
+      if (underscore) return unwrapPair(text, lo, hi, underscore, 1);
     }
     return toggleWrap(text, lo, hi, inlineMarker);
   }

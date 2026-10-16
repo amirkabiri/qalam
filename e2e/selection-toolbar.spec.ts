@@ -116,6 +116,47 @@ test.describe('selection toolbar', () => {
     await expect(editor(page)).toHaveValue(DOC);
   });
 
+  test('Bold toggles: re-selecting bolded text shows the active state and Bold unwraps', async ({ page }) => {
+    await boot(page);
+    await loadDocumentText(page, DOC);
+
+    // Double-click selects the word "Second" (line 2, y:60) → Bold wraps it.
+    await editor(page).dblclick({ position: { x: 70, y: 60 } });
+    await expect(toolbar(page)).toBeVisible();
+    await expect(toolbar(page).getByRole('button', { name: 'Bold' }))
+      .toHaveAttribute('aria-pressed', 'false');
+    await toolbar(page).getByRole('button', { name: 'Bold' }).click();
+    await expect(editor(page)).toHaveValue(
+      'Bleeding ink on paper\n**Second** line here\nThird line ends here',
+    );
+
+    // Re-select exactly the same text — deterministically with the keyboard
+    // (click into line 2, Home, past the ** markers, then shift-select the
+    // six letters of "Second"; explicit presses — no-await-in-loop).
+    await editor(page).click({ position: { x: 60, y: 60 } });
+    await editor(page).press('Home');
+    await editor(page).press('ArrowRight');
+    await editor(page).press('ArrowRight');
+    await editor(page).press('Shift+ArrowRight');
+    await editor(page).press('Shift+ArrowRight');
+    await editor(page).press('Shift+ArrowRight');
+    await editor(page).press('Shift+ArrowRight');
+    await editor(page).press('Shift+ArrowRight');
+    await editor(page).press('Shift+ArrowRight');
+
+    // The toolbar re-opens with Bold shown ACTIVE (the selection's current
+    // formatting), still floating clear of the live selection.
+    await expect(toolbar(page)).toBeVisible();
+    const bold = toolbar(page).getByRole('button', { name: 'Bold' });
+    await expect(bold).toHaveAttribute('aria-pressed', 'true');
+    await expectLiveSelection(page);
+    await expectToolbarClearOfSelection(page);
+
+    // Clicking Bold on already-bold text UNWRAPS — no double ** markers.
+    await bold.click();
+    await expect(editor(page)).toHaveValue(DOC);
+  });
+
   test('Escape dismisses and typing lands back in the editor', async ({ page }) => {
     await boot(page);
     await loadDocumentText(page, DOC);
