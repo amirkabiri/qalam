@@ -2,7 +2,9 @@
 // New dialog: releases mapping (markdown flattened to plain bullets), the
 // commits fallback when no release exists, failure on HTTP errors, and the
 // localized date formatting.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach, describe, expect, it, vi,
+} from 'vitest';
 
 import {
   fetchWhatsNew, formatWhatsNewDate, releaseItems,
