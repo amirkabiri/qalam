@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/amirkabiri/qalam/compare/v1.0.0...v1.0.1) (2026-10-16)
+
+### Bug Fixes
+
+* **release:** disable no-template-curly-in-string for semantic-release interpolation templates ([ae686e6](https://github.com/amirkabiri/qalam/commit/ae686e6f92c628b2cfc7563e0df892396ed72150))
+
 ## 1.0.0 (2026-10-16)
 
 ### Features
