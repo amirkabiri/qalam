@@ -128,6 +128,21 @@ describe('<Preview /> injection', () => {
 
     expect(article().querySelector('.error-note')).toHaveTextContent('boom');
   });
+
+  it('is NOT a live region — state changes announce via the status region instead', () => {
+    // The article re-injects its HTML on every typing debounce; as a live
+    // region it would re-announce the whole document each pause.
+    renderHarness({ state: makeState({ error: 'boom' }) });
+
+    expect(article()).not.toHaveAttribute('aria-live');
+    expect(screen.getByRole('status')).toHaveTextContent('boom');
+  });
+
+  it('has no status region in the happy path', () => {
+    renderHarness({ state: makeState() });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });
 
 describe('<Preview /> copy buttons', () => {

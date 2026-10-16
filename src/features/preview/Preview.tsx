@@ -502,16 +502,25 @@ export default function Preview({
   return (
     <div className={styles.previewScroll} ref={scrollRef} tabIndex={-1}>
       {/* Sanitized upstream by DOMPurify inside the frozen lib/markdown
-          pipeline — this is the injection point the design mandates. */}
+          pipeline — this is the injection point the design mandates.
+          NOT a live region: the article re-injects its full HTML on every
+          typing debounce, so aria-live here would re-announce the whole
+          document to screen readers; state changes are announced by the
+          small status region below instead. */}
       <article
         key={theme}
         ref={articleRef}
         className={styles.markdownBody}
         dir={dir}
-        aria-live="polite"
-        /* eslint-disable-next-line react/no-danger */
+        /* eslint-disable-next-line react/no-danger -- sanitized upstream by
+           DOMPurify inside the frozen lib/markdown pipeline */
         dangerouslySetInnerHTML={{ __html: previewHtml(state, t('tooLarge')) }}
       />
+      {(state.error !== null || state.tooLarge) && (
+        <div className={styles.srOnly} role="status">
+          {state.tooLarge ? t('tooLarge') : state.error}
+        </div>
+      )}
       {ask && (
         <div className={styles.askPop} style={{ top: ask.top, left: ask.left }}>
           <button

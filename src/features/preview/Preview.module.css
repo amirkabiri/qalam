@@ -329,3 +329,18 @@
   direction: ltr;
   unicode-bidi: plaintext;
 }
+
+/* Visually-hidden live announcement for preview state changes (errors,
+   too-large): announces without re-announcing the whole article. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
