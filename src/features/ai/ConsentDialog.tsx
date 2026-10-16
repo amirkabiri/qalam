@@ -6,7 +6,6 @@
 // the same attention-gated semantics — outside click does nothing, an explicit
 // button answer is required). ONLY the Download press continues into the
 // download (user activation); "Not now" keeps the draft and shows the honest
-// unavailable explainer. Legacy twin: legacy/src/ai/index.ts downloadable
 // state + docs/uikit-research.md consent gate.
 
 import {

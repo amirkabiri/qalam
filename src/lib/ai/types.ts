@@ -1,5 +1,4 @@
 // Module: ai/types — shared provider contracts. Pure types only, no runtime
-// code. Legacy twin: legacy/src/ai/types.ts.
 
 /** Which backend the assistant panel routes requests to. */
 export type ProviderId = 'builtin' | 'openai' | 'anthropic';

@@ -3,8 +3,7 @@
 // external fields (base URL, API token, model), the direct-edit toggle (the
 // agent's WRITE permission — persists immediately), and Save (validate +
 // persist + activate — the parent owns the draft state and normalization, so
-// this form is fully controlled and needs no prop-sync effects). Legacy twin:
-// legacy/src/ai/index.ts buildSettingsSection().
+// this form is fully controlled and needs no prop-sync effects).
 
 import {
   Button,

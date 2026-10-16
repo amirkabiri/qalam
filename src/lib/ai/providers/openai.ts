@@ -2,8 +2,7 @@
 // chat services (api.openai.com, OpenRouter, llama.cpp server, vLLM, …).
 // POST {baseUrl}/chat/completions with `Authorization: Bearer <token>` (token
 // optional — some gateways don't need one) and `stream: true`; deltas come as
-// SSE `data:` lines terminated by `data: [DONE]`. Legacy twin:
-// legacy/src/ai/providers/openai.ts (the parseSSEData re-export is gone —
+// SSE `data:` lines terminated by `data: [DONE]`.
 // tests hit providers/sse directly).
 
 import { streamSSEDeltas } from './sse';

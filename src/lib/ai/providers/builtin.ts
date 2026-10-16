@@ -3,8 +3,7 @@
 // lazily created, reused across requests, destroyed via destroy() (pagehide).
 // The system prompt lives in the session (initialPrompts); stream() maps the
 // message list onto a single session prompt and applies the cumulative-chunk
-// guard (normalizeStreamChunk) some builds need. Legacy twin:
-// legacy/src/ai/providers/builtin.ts.
+// guard (normalizeStreamChunk) some builds need.
 
 import normalizeStreamChunk from '../chunk';
 import { selfAi } from './ambient';

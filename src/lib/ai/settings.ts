@@ -1,8 +1,7 @@
 // Module: ai/settings — validated load/save of the AI provider configuration
 // in localStorage under the `mv:ai` key (via the shared MvStore). Invalid or
 // hostile stored values are ignored/repaired, never thrown. The apiKey is
-// client-side only and is never logged anywhere in this module. Legacy twin:
-// legacy/src/ai/settings.ts.
+// client-side only and is never logged anywhere in this module.
 
 import { store } from '../store';
 import type { ProviderId, ProviderSettings } from './types';

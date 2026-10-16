@@ -1,5 +1,4 @@
 // Module: ai/chunk — pure streaming text helpers. No imports, no DOM.
-// Legacy twin: legacy/src/ai/chunk.ts. Single-helper module → default export
 // (STYLEGUIDE "Exports", per import-x/prefer-default-export).
 
 /**

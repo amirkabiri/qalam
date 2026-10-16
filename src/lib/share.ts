@@ -3,7 +3,6 @@
 // limits (SHARE_WARN_CHARS / SHARE_MAX_CHARS). Pure compute: no imports, no
 // DOM writes, no i18n side effects — the linkWarn/linkTooLarge/sharedDoc
 // strings live in src/i18n/dictionaries.ts and the share dialog/clipboard UI
-// is the React layer's job. Legacy twin: legacy/src/share.ts.
 
 /* ---------------- capacity limits ---------------- */
 

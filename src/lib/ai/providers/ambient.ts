@@ -1,7 +1,6 @@
 // Module: ai/providers/ambient — minimal ambient types for the Chrome
 // built-in AI APIs (Prompt API, Summarizer, Rewriter, Translator). They are
 // not in lib.dom yet. Verified against docs/ai-research.md (Chrome 138/148
-// surfaces). Legacy twin: legacy/src/ai/ambient.ts.
 
 interface AiDownloadProgressEvent {
   loaded?: number;

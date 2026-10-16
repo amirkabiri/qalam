@@ -16,7 +16,6 @@
 //     mermaid.initialize(mermaidConfig(theme)) then mermaid.run() over the
 //     shells (or render the sources directly), and mark failures with
 //     .mermaid-failed + the mermaidError string from src/i18n/dictionaries.
-// Legacy twin: legacy/src/markdown.ts.
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';

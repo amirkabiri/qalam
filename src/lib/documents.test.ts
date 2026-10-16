@@ -1,7 +1,7 @@
 // Unit tests for src/lib/documents.ts — the pure document-loading helpers.
 // Legacy covered none of these (they were fused to the DOM app); the
 // github blob→raw conversion, pretty naming, the timed fetch contract,
-// share-hash detection and the mv:recent store ops are pinned here. Network
+// share-hash detection are pinned here. Network
 // is faked with real Response objects per TESTING.md; storage with the
 // in-memory Storage fake.
 
@@ -13,17 +13,11 @@ import {
   vi,
 } from 'vitest';
 import {
-  MAX_RECENT,
-  addRecent,
   fetchText,
-  getRecent,
   hasShareHash,
   normalizeGitHubUrl,
   prettyName,
 } from './documents';
-import type { RecentItem } from './documents';
-import { createMvStore } from './store';
-import makeStorage from '../test/fakes';
 
 const PAGE = 'https://example.github.io/markdown-viewer/';
 
@@ -160,48 +154,3 @@ describe('fetchText', () => {
   });
 });
 
-/* ---------------- recent documents (mv:recent) ---------------- */
-
-describe('recent documents', () => {
-  const doc = (name: string, url: string): RecentItem => ({
-    name,
-    url,
-  });
-
-  it('defaults to an empty list', () => {
-    expect(getRecent(createMvStore(makeStorage()))).toEqual([]);
-  });
-
-  it('prepends the visited document and persists under mv:recent', () => {
-    const storage = makeStorage();
-    const store = createMvStore(storage);
-
-    const list = addRecent(store, doc('Notes', 'https://x/notes.md'));
-
-    expect(list).toEqual([doc('Notes', 'https://x/notes.md')]);
-    expect(JSON.parse(storage.getItem('mv:recent') as string)).toEqual([
-      doc('Notes', 'https://x/notes.md'),
-    ]);
-  });
-
-  it('moves a revisited URL to the front instead of duplicating it', () => {
-    const store = createMvStore(makeStorage());
-    addRecent(store, doc('A', 'https://x/a.md'));
-    addRecent(store, doc('B', 'https://x/b.md'));
-
-    const list = addRecent(store, doc('A (updated)', 'https://x/a.md'));
-
-    expect(list.map((r) => r.url)).toEqual(['https://x/a.md', 'https://x/b.md']);
-    expect(list[0].name).toBe('A (updated)');
-  });
-
-  it(`keeps at most ${MAX_RECENT} entries`, () => {
-    const store = createMvStore(makeStorage());
-    for (let i = 0; i < MAX_RECENT + 2; i += 1) addRecent(store, doc(`D${i}`, `https://x/${i}.md`));
-
-    const list = getRecent(store);
-    expect(list).toHaveLength(MAX_RECENT);
-    expect(list[0].url).toBe(`https://x/${MAX_RECENT + 1}.md`); // newest survives
-    expect(list[list.length - 1].url).toBe('https://x/2.md'); // oldest evicted
-  });
-});

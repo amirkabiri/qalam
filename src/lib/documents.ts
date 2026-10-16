@@ -1,23 +1,10 @@
 // Module: lib/documents — the PURE halves of the document-loading flow.
 // Owner of normalizeGitHubUrl (github blob/raw → raw.githubusercontent),
 // prettyName, fetchText (20 s abort timeout, HTTP-status errors, injectable
-// fetcher), the #d= share-hash check, and the recent-documents ops over the
-// mv:* store (key 'recent', cap 8 — identical to legacy). The DOM halves —
-// setDoc/loadUrl/loadFile/loadWelcome, the loading indicator, hash routing
-// and renderRecent — stay in legacy/src/documents.ts for the UI agents to
-// re-imagine as React effects. i18n keys (loadError/tooLarge/welcome/
-// pastedDoc/unnamedDoc) live in src/i18n/dictionaries.ts. Legacy twin:
-// legacy/src/documents.ts.
-
-import type { MvStore } from './store';
-
-export interface RecentItem {
-  name: string;
-  url: string;
-}
-
-/** Recent-documents cap (identical to legacy). */
-export const MAX_RECENT = 8;
+// fetcher) and the #d= share-hash check. (The legacy mv:recent list is gone:
+// documents are repository records now — see src/lib/persistence.) i18n keys
+// (loadError/tooLarge/welcome/pastedDoc/unnamedDoc) live in
+// src/i18n/dictionaries.ts.
 
 /** Abort a stalled download after this long (identical to legacy). */
 export const FETCH_TIMEOUT_MS = 20000;
@@ -88,20 +75,3 @@ export function hasShareHash(hash: string): boolean {
   return hash.startsWith('#d=');
 }
 
-/* ---------------- recent documents (mv:recent) ---------------- */
-
-/** The stored recents, newest first ([] when none are stored). */
-export function getRecent(store: MvStore): RecentItem[] {
-  return store.get<RecentItem[]>('recent', []);
-}
-
-/**
- * Moves `item` to the front (deduped by URL) and persists the list under
- * `mv:recent`, returning the new list. The legacy DOM refresh (renderRecent)
- * is the React layer's reaction to the store change.
- */
-export function addRecent(store: MvStore, item: RecentItem): RecentItem[] {
-  const list = [item, ...getRecent(store).filter((x) => x.url !== item.url)].slice(0, MAX_RECENT);
-  store.set('recent', list);
-  return list;
-}

@@ -1,7 +1,6 @@
 // Module: ai/providers/sse — Server-Sent-Events helpers shared by the
 // fetch-based providers. parseSSEData is a pure, unit-testable core; the
-// streaming wrapper only adds network-chunk line buffering. Legacy twin:
-// legacy/src/ai/providers/sse.ts.
+// streaming wrapper only adds network-chunk line buffering.
 
 /**
  * Pure SSE parser: given a text block of complete lines, returns the payload

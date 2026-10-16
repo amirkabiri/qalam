@@ -7,7 +7,6 @@
 // replace-document confirm, the bubbling input event) — STAYS in
 // legacy/src/ai/edits.ts on purpose: the React layer re-imagines it as
 // effects over the editor. The aiReplaceDocConfirm string lives in
-// src/i18n/dictionaries.ts. Legacy twin: legacy/src/ai/edits.ts.
 
 import { BUILTIN_SYSTEM_PROMPT } from './providers/builtin';
 import { countLines } from './tool-results';

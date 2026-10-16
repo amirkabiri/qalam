@@ -2,8 +2,7 @@
 // a ChatProvider instance for the external (HTTP) backends. The builtin
 // on-device provider is NOT built here: its session lifecycle (lazily created,
 // download consent, destroy on close) is owned by the panel's availability
-// machine via a single BuiltinProvider instance. Legacy twin:
-// legacy/src/ai/index.ts ensureProvider() external branch.
+// machine via a single BuiltinProvider instance.
 
 import { createAnthropicProvider } from '../../lib/ai/providers/anthropic';
 import { createOpenAIProvider } from '../../lib/ai/providers/openai';

@@ -1,7 +1,6 @@
 // Module: ai/providers/http — safe HTTP error reporting shared by the
 // fetch-based providers. Response bodies may echo secrets (e.g. an invalid
 // API key) — everything surfaced in an Error message is redacted and
-// truncated. Legacy twin: legacy/src/ai/providers/http.ts.
 
 const TOKEN_RE = /sk-[A-Za-z0-9][A-Za-z0-9_-]{2,}/g; // sk-…-style API tokens
 
