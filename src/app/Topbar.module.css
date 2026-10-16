@@ -121,7 +121,36 @@
 }
 
 @media (max-width: 880px) {
-  .btn span { display: none; }   /* icon-only Open button */
+  /* icon-only Open button — the lang button keeps its EN/فا label (it IS the
+     label; hiding it left an empty pill on tablets/phones) */
+  .btnPrimary span { display: none; }
   .btn { padding-inline: 10px; }
   .brand span { display: none; }
+}
+
+/* Narrow screens: the full bar is ~550px wide, far past phone widths. Tighten
+   the controls, then drop the keyboard-centric + secondary actions (keyboard
+   cheat sheet needs a hardware keyboard; GitHub stays in the sidebar and app
+   footers). The row scrolls horizontally without a scrollbar as the last
+   safety valve for very narrow devices instead of overflowing the page —
+   RTL overflow used to shove the whole workspace sideways. */
+@media (max-width: 600px) {
+  .topbar {
+    gap: 4px;
+    padding-inline: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar::-webkit-scrollbar { display: none; }
+  .iconBtn { width: 30px; }
+  .segment { width: 28px; }
+  .btn { padding-inline: 9px; }
+  .langBtn { min-width: 38px; }
+  .brand { padding-inline: 4px; }
+  .hideNarrow { display: none; }
+}
+
+@media (max-width: 430px) {
+  .topbar { gap: 3px; }
+  .hideTight { display: none; }
 }

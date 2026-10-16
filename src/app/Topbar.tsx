@@ -237,7 +237,7 @@ export default function Topbar({
 
       <button
         type="button"
-        className={styles.iconBtn}
+        className={`${styles.iconBtn} ${styles.hideNarrow}`}
         aria-label={t('shortcuts')}
         title={t('shortcuts')}
         onClick={onShortcuts}
@@ -247,7 +247,7 @@ export default function Topbar({
 
       <button
         type="button"
-        className={styles.iconBtn}
+        className={`${styles.iconBtn} ${styles.hideTight}`}
         aria-label={t('whatsNew')}
         title={t('whatsNew')}
         onClick={onWhatsNew}
@@ -278,7 +278,7 @@ export default function Topbar({
       </button>
 
       <a
-        className={styles.iconBtn}
+        className={`${styles.iconBtn} ${styles.hideNarrow}`}
         href="https://github.com/amirkabiri/qalam"
         target="_blank"
         rel="noopener noreferrer"
