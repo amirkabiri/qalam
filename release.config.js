@@ -5,6 +5,8 @@
 // CHANGELOG.md and syncs package.json — fully automatic on every push to
 // main. release-please fits better when a human release PR is wanted; here
 // the board flow assumes hands-off releases.
+// Qalam's tag/changelog templates — semantic-release interpolation, not JS.
+/* eslint-disable no-template-curly-in-string */
 /** @type {import('semantic-release').GlobalConfig} */
 export default {
   branches: ['main'],
