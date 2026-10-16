@@ -72,7 +72,23 @@ class ShellErrorBoundary extends Component<BoundaryProps, BoundaryState> {
         >
           {title}
         </p>
-        <button type="button" onClick={onRetry}>{retry}</button>
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            fontFamily: 'inherit',
+            fontSize: 13.5,
+            fontWeight: 600,
+            padding: '8px 16px',
+            borderRadius: 8,
+            border: '1px solid var(--accent)',
+            background: 'var(--accent)',
+            color: 'var(--accent-contrast)',
+            cursor: 'pointer',
+          }}
+        >
+          {retry}
+        </button>
       </div>
     );
   }
