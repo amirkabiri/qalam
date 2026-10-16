@@ -377,6 +377,7 @@ describe('createAgent().run — provider failure', () => {
   it('rethrows when the stream dies before producing anything (an empty answer is not silence)', async () => {
     const provider = new FakeProvider('');
     provider.stream = async function* deadStream(_messages: ChatMessage[]) {
+      // A stream that dies BEFORE the first chunk (no yield — by design).
       throw new Error('connection refused');
     };
     const executor = new FakeExecutor();

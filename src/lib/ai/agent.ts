@@ -374,7 +374,11 @@ export function createAgent(deps: AgentDeps) {
         const calls = extractToolCalls(reply);
 
         if (calls.length === 0 && !QALAM_OPEN.test(reply)) {
-          if (reply === '' && streamError !== null) throw streamError;
+          if (reply === '' && streamError !== null) {
+            throw streamError instanceof Error
+              ? streamError
+              : new Error(String(streamError));
+          }
           yield { type: 'done', text: stripToolBlocks(reply) }; // plain Markdown → final answer
           return;
         }

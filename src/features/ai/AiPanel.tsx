@@ -617,9 +617,13 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
         const target = prev.find((m) => m.id === assistantId);
         const finished = prev.map((m) => {
           if (m.id !== assistantId) return m;
-          return streamFailed
-            ? { ...m, text: final, pending: false, failed: true }
-            : { ...m, text: final, pending: false };
+          if (!streamFailed) return { ...m, text: final, pending: false };
+          return {
+            ...m,
+            text: final,
+            pending: false,
+            failed: true,
+          };
         });
         const empty = !streamFailed
           && final === ''
