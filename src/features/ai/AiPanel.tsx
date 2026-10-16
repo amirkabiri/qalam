@@ -68,11 +68,20 @@ import ConsentDialog from './ConsentDialog';
 import AiSettingsForm from './AiSettingsForm';
 import type { ProviderDraft } from './AiSettingsForm';
 import ToolActivity, { statusForOutcome } from './ToolActivity';
-import type { ToolCallStatus, ToolCallView } from './ToolActivity';
+import type { ToolCallStatus } from './ToolActivity';
 import PendingDiffCard from './PendingDiffCard';
-import type { PendingDiffStatus, PendingDiffView } from './pendingDiff';
+import type { PendingDiffView } from './pendingDiff';
 import { applyPendingDiff, createToolExecutor } from './executor';
 import { lineRangeOfOffset } from '../../lib/ai/tool-results';
+import {
+  appendSendPair,
+  applyAgentText,
+  applyAgentToolResult,
+  applyAgentToolStart,
+  finalizeRun,
+  settleDiff,
+} from './chatTranscript';
+import type { ChatEntry } from './chatTranscript';
 import { aiToast } from './toast-queue';
 import { previewExcerptQueue } from './previewExcerpt';
 import type { PreviewExcerptPayload } from './previewExcerpt';
@@ -87,17 +96,6 @@ export interface AiPanelProps {
   t: (key: string) => string;
   /** Active UI language — drives the kit's RTL direction and local digits. */
   lang: Lang;
-}
-
-interface ChatEntry {
-  id: number;
-  role: 'user' | 'assistant';
-  text: string;
-  tools: ToolCallView[];
-  diffs: PendingDiffView[];
-  pending: boolean;
-  /** The run died before/without a reply — the bubble shows the failure. */
-  failed?: boolean;
 }
 
 /** A send captured before any await (the prompt + pinned edit target). */
@@ -455,24 +453,19 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
    *  on the live document; line-anchored ones refuse when it moved. */
   const applyDiff = (assistantId: number, diff: PendingDiffView): void => {
     const result = applyPendingDiff(editor, diff, withEditorAccess);
-    const stepStatus: ToolCallStatus = result.applied ? 'applied' : 'error';
     if (result.applied) {
       resolutionRef.current = { tool: diff.data.tool, resolution: 'applied' };
       aiToast(tt('aiToolApplied'));
     } else {
       aiToast(tt('aiDiffChanged'), 'error');
     }
-    setMessages((prev) => prev.map((message) => {
-      if (message.id !== assistantId) return message;
-      const nextStatus: PendingDiffStatus = result.applied ? 'applied' : 'error';
-      return {
-        ...message,
-        tools: message.tools.map((step) => (step.id === diff.stepId
-          ? { ...step, status: stepStatus }
-          : step)),
-        diffs: message.diffs.map((d) => (d.id === diff.id ? { ...d, status: nextStatus } : d)),
-      };
-    }));
+    setMessages((prev) => settleDiff(
+      prev,
+      assistantId,
+      diff.stepId,
+      diff.id,
+      result.applied ? 'applied' : 'error',
+    ));
   };
 
   /** Discards one pending diff — reported back on the next send so the model
@@ -480,16 +473,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
   const discardDiff = (assistantId: number, diff: PendingDiffView): void => {
     resolutionRef.current = { tool: diff.data.tool, resolution: 'discarded' };
     aiToast(tt('aiToolDiscarded'));
-    setMessages((prev) => prev.map((message) => {
-      if (message.id !== assistantId) return message;
-      return {
-        ...message,
-        tools: message.tools.map((step) => (step.id === diff.stepId
-          ? { ...step, status: 'discarded' }
-          : step)),
-        diffs: message.diffs.map((d) => (d.id === diff.id ? { ...d, status: 'discarded' as const } : d)),
-      };
-    }));
+    setMessages((prev) => settleDiff(prev, assistantId, diff.stepId, diff.id, 'discarded'));
   };
 
   /** Runs one send end-to-end against the agent loop. */
@@ -527,25 +511,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
       if (req.excerpt) setExcerpt(null); // context is now part of the message
       const userId = nextId();
       const assistantId = nextId();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: userId,
-          role: 'user',
-          text: req.question,
-          tools: [],
-          diffs: [],
-          pending: false,
-        },
-        {
-          id: assistantId,
-          role: 'assistant',
-          text: '',
-          tools: [],
-          diffs: [],
-          pending: true,
-        },
-      ]);
+      setMessages((prev) => appendSendPair(prev, userId, assistantId, req.question));
 
       const agent = createAgent({
         provider,
@@ -558,47 +524,31 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
         for await (const ev of agent.run(prompt)) {
           if (ev.type === 'text') {
             setLoadingLabel(null); // first event → loading phase over
-            setMessages((prev) => prev.map((m) => {
-              if (m.id !== assistantId) return m;
-              return { ...m, text: ev.text };
-            }));
+            setMessages((prev) => applyAgentText(prev, assistantId, ev.text));
           } else if (ev.type === 'tool') {
             setLoadingLabel(null);
-            const step: ToolCallView = {
+            setMessages((prev) => applyAgentToolStart(prev, assistantId, {
               id: nextId(),
               tool: ev.tool,
               status: 'running',
-            };
-            setMessages((prev) => prev.map((m) => {
-              if (m.id !== assistantId) return m;
-              return { ...m, tools: [...m.tools, step] };
             }));
           } else if (ev.type === 'tool-result') {
             setLoadingLabel(null);
             const { outcome } = ev;
             const stepStatus: ToolCallStatus = statusForOutcome(outcome);
-            setMessages((prev) => prev.map((m) => {
-              if (m.id !== assistantId) return m;
-              const tools = [...m.tools];
-              let settledId = -1;
-              for (let i = tools.length - 1; i >= 0; i -= 1) {
-                const step = tools[i];
-                if (step.status === 'running' && step.tool === ev.tool) {
-                  tools[i] = { ...step, status: stepStatus };
-                  settledId = step.id;
-                  break;
-                }
+            const diff = outcome.status === 'pending'
+              ? {
+                id: nextId(),
+                stepId: -1, // settled against the matching running step
+                data: outcome.diff,
+                docAtProposal: editor.getText(),
               }
-              const diffs = outcome.status === 'pending' && settledId >= 0
-                ? [...m.diffs, {
-                  id: nextId(),
-                  stepId: settledId,
-                  status: 'pending' as const,
-                  data: outcome.diff,
-                  docAtProposal: editor.getText(),
-                }]
-                : m.diffs;
-              return { ...m, tools, diffs };
+              : null;
+            setMessages((prev) => applyAgentToolResult(prev, {
+              assistantId,
+              status: stepStatus,
+              tool: ev.tool,
+              diff,
             }));
           } else {
             final = ev.text;
@@ -613,23 +563,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
 
       // Finalize; drop an empty tool-free bubble (legacy "Working…" cleanup)
       // — but a failed run always stays, with the error note rendered.
-      setMessages((prev) => {
-        const target = prev.find((m) => m.id === assistantId);
-        const finished = prev.map((m) => {
-          if (m.id !== assistantId) return m;
-          if (!streamFailed) return { ...m, text: final, pending: false };
-          return {
-            ...m,
-            text: final,
-            pending: false,
-            failed: true,
-          };
-        });
-        const empty = !streamFailed
-          && final === ''
-          && (target?.tools.length ?? 0) === 0;
-        return empty ? finished.filter((m) => m.id !== assistantId) : finished;
-      });
+      setMessages((prev) => finalizeRun(prev, assistantId, final, streamFailed));
     } finally {
       busyRef.current = false;
       setBusy(false);
