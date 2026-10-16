@@ -33,7 +33,12 @@ import {
   fetchText, hasShareHash, normalizeGitHubUrl, prettyName,
 } from '../../lib/documents';
 import { shareDecode } from '../../lib/share';
-import { MAX_INPUT_BYTES, store, type Doc } from '../../lib/store';
+import {
+  MAX_INPUT_BYTES,
+  byteLengthOver,
+  store,
+  type Doc,
+} from '../../lib/store';
 
 import WELCOME_MD from './welcome';
 
@@ -345,7 +350,7 @@ export function useDocuments(deps: DocumentsDeps): DocumentsController {
     let ok = false;
     try {
       const text = await fetchText(target, { fetchImpl: depsRef.current.fetchImpl });
-      if (new TextEncoder().encode(text).length > MAX_INPUT_BYTES) {
+      if (byteLengthOver(text, MAX_INPUT_BYTES)) {
         throw new Error(tRef.current('tooLarge'));
       }
       // Dedupe re-loads of the same URL: update the existing record.
@@ -526,7 +531,7 @@ export function useDocuments(deps: DocumentsDeps): DocumentsController {
       depsRef.current.toast(tRef.current('loadError'), 'error');
       return false;
     }
-    if (new TextEncoder().encode(text).length > MAX_INPUT_BYTES) {
+    if (byteLengthOver(text, MAX_INPUT_BYTES)) {
       depsRef.current.toast(tRef.current('tooLarge'), 'error');
       return false;
     }

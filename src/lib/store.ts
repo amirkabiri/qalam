@@ -10,6 +10,38 @@
 /** Hard cap on any document entering the app (10 MB). */
 export const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 
+const SHARED_ENCODER = new TextEncoder();
+
+/**
+ * True when `text`'s UTF-8 byte length exceeds `max` — byte-exact, without
+ * the full byte copy `encode()` would allocate (a real cost on a 10 MB
+ * document re-checked on every preview debounce / load). A counting scan
+ * that never materializes the bytes, with an early bail once the cap is
+ * crossed. There is NO cheap sound fast path from the unit count: multi-byte
+ * scripts (Persian letters are 2 UTF-8 bytes, CJK 3) blow the byte cap well
+ * below the unit cap. Lone
+ * surrogates follow TextEncoder (U+FFFD, 3 bytes); pairs count 4.
+ */
+export function byteLengthOver(text: string, max: number): boolean {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (c >= 0xD800 && c <= 0xDBFF) {
+      bytes += 4; // surrogate pair: the low surrogate is consumed with it
+      i += 1;
+    } else if (c >= 0x800) bytes += 3;
+    else if (c >= 0x80) bytes += 2;
+    else bytes += 1;
+    if (bytes > max) return true; // bail out early — no need to finish the scan
+  }
+  return bytes > max;
+}
+
+/** The exact encoded length (test oracle for byteLengthOver). */
+export function encodedByteLength(text: string): number {
+  return SHARED_ENCODER.encode(text).length;
+}
+
 /** Prefix of every key this app writes to localStorage (identical to legacy). */
 export const MV_KEY_PREFIX = 'mv:';
 

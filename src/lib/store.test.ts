@@ -7,12 +7,14 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_INPUT_BYTES,
   MV_KEY_PREFIX,
+  byteLengthOver,
   countChars,
   countWords,
   createMvStore,
   defaultLang,
   defaultTheme,
   detectDir,
+  encodedByteLength,
   enumOr,
   localeForLang,
   mvKey,
@@ -176,6 +178,40 @@ describe('defaultLang / defaultTheme', () => {
   it('defaults the theme to dark only when the OS prefers dark', () => {
     expect(defaultTheme(true)).toBe('dark');
     expect(defaultTheme(false)).toBe('light');
+  });
+});
+
+describe('byteLengthOver', () => {
+  it('agrees with the real encoder byte-for-byte across scripts and boundaries', () => {
+    const samples = [
+      '',
+      'plain ascii text',
+      'ق'.repeat(10), // 2 bytes/char (U+0642 is in U+0600–U+06FF)
+      '日本語'.repeat(4), // 3 bytes/char
+      'emoji 👍👍🏽 mix', // surrogate pairs: 4 bytes
+      'mixed ASCII + متن + 😀',
+      'a'.repeat(1000),
+      '\uFFFD\uFFFD', // replacement chars
+    ];
+    samples.forEach((text) => {
+      const exact = encodedByteLength(text);
+      expect(byteLengthOver(text, exact)).toBe(false);
+      expect(byteLengthOver(text, exact - 1)).toBe(true);
+    });
+  });
+
+  it('is false at and under the cap, true past it (ASCII)', () => {
+    expect(byteLengthOver('x'.repeat(MAX_INPUT_BYTES), MAX_INPUT_BYTES)).toBe(false);
+    expect(byteLengthOver('x'.repeat(MAX_INPUT_BYTES + 1), MAX_INPUT_BYTES)).toBe(true);
+  });
+
+  it('is true for a multi-byte document whose BYTES exceed the cap despite a sub-cap unit count', () => {
+    // The regression this helper must not reintroduce: Persian letters are
+    // U+0600–U+06FF ⇒ 2 UTF-8 bytes each, so a document whose UNIT count is
+    // under the cap can still be over the BYTE cap.
+    const units = Math.floor((MAX_INPUT_BYTES / 4) * 3); // 0.75× cap units…
+    const text = 'ق'.repeat(units); // …×2 bytes/unit ⇒ 1.5× cap bytes
+    expect(byteLengthOver(text, MAX_INPUT_BYTES)).toBe(true);
   });
 });
 

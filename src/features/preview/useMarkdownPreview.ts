@@ -5,7 +5,7 @@
 // DOM is <Preview />'s job.
 import { useEffect, useMemo, useState } from 'react';
 
-import { MAX_INPUT_BYTES } from '../../lib/store';
+import { MAX_INPUT_BYTES, byteLengthOver } from '../../lib/store';
 import { RENDER_DEBOUNCE_MS, renderMarkdown } from '../../lib/markdown';
 import type { MarkdownTocEntry } from '../../lib/markdown';
 
@@ -61,7 +61,7 @@ export function useMarkdownPreview(
   }, [text]);
 
   return useMemo<MarkdownPreviewState>(() => {
-    if (new TextEncoder().encode(debounced).length > MAX_INPUT_BYTES) {
+    if (byteLengthOver(debounced, MAX_INPUT_BYTES)) {
       return { ...EMPTY, tooLarge: true };
     }
     const result = renderMarkdown(debounced, { baseUrl });
