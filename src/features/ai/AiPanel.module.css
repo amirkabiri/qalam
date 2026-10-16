@@ -387,6 +387,11 @@
   color: var(--text-muted);
 }
 
+.msgError {
+  margin-top: 4px;
+  color: var(--danger);
+}
+
 /* ---------------- visible tool-call activity ---------------- */
 
 .toolList {

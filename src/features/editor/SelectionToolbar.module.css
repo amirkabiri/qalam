@@ -44,6 +44,15 @@
   outline: none;
 }
 
+/* Active state (t_d18b34b2): the button reflects the selection's CURRENT
+   formatting — bold-on-bold shows pressed, and clicking toggles it off. */
+.btnActive,
+.btnActive:hover,
+.btnActive:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 /* Decorative glyphs (aria-label carries the accessible name). */
 .glyphBold {
   font-weight: 700;

@@ -25,6 +25,7 @@ import type { CSSProperties, RefObject } from 'react';
 import { useT } from '../../app/i18n';
 
 import type { CaretMeasurer } from './caretGeometry';
+import { getSelectionFormatting } from './markdownActions';
 import type { FormatAction } from './markdownActions';
 import styles from './SelectionToolbar.module.css';
 import { useSelectionToolbar } from './useSelectionToolbar';
@@ -78,7 +79,7 @@ export default function SelectionToolbar({
   const t = useT();
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const {
-    open, anchor, placement, hide, applyAction,
+    open, anchor, placement, range, hide, applyAction,
   } = useSelectionToolbar({
     textareaRef, controller, readOnly, createMeasurer,
   });
@@ -97,6 +98,12 @@ export default function SelectionToolbar({
   }, [open, anchor, placement]);
 
   if (!open) return null;
+
+  // The selection's CURRENT formatting (t_d18b34b2): the pinned range read
+  // against the live document text — each button renders aria-pressed from
+  // it, and the pure actions below toggle accordingly (bold on bold text
+  // UNWRAPS instead of double-wrapping).
+  const formatting = getSelectionFormatting(controller.text, range[0], range[1]);
 
   // Above the selection (bottom edge `offset` px over its top), or below the
   // selection end when flipped (top edge `offset` px under its bottom).
@@ -125,21 +132,26 @@ export default function SelectionToolbar({
     >
       {ACTIONS.map(({
         id, labelKey, glyph, glyphClass,
-      }) => (
-        <button
-          key={id}
-          type="button"
-          className={styles.btn}
-          title={t(labelKey)}
-          aria-label={t(labelKey)}
-          // THE fix for the lost selection: the pointer never moves focus
-          // out of the textarea, so the live selection stays highlighted.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyAction(id)}
-        >
-          <span aria-hidden="true" className={glyphClass}>{glyph}</span>
-        </button>
-      ))}
+      }) => {
+        const active = formatting[id];
+        return (
+          <button
+            key={id}
+            type="button"
+            className={active ? `${styles.btn} ${styles.btnActive}` : styles.btn}
+            title={t(labelKey)}
+            aria-label={t(labelKey)}
+            aria-pressed={active}
+            data-active={active || undefined}
+            // THE fix for the lost selection: the pointer never moves focus
+            // out of the textarea, so the live selection stays highlighted.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => applyAction(id)}
+          >
+            <span aria-hidden="true" className={glyphClass}>{glyph}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

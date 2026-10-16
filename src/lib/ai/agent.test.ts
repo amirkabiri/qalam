@@ -373,6 +373,18 @@ describe('createAgent().run — provider failure', () => {
     expect(doneOf(events)).toBe('Partial'); // partial text survives, run ends
     expect(executor.calls).toHaveLength(0);
   });
+
+  it('rethrows when the stream dies before producing anything (an empty answer is not silence)', async () => {
+    const provider = new FakeProvider('');
+    provider.stream = async function* deadStream(_messages: ChatMessage[]) {
+      throw new Error('connection refused');
+    };
+    const executor = new FakeExecutor();
+    await expect(
+      collect(createAgent({ provider, executor }).run(CHAT)),
+    ).rejects.toThrow('connection refused');
+    expect(executor.calls).toHaveLength(0);
+  });
 });
 
 describe('createAgent().run — tool-call cap', () => {

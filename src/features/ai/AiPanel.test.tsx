@@ -588,3 +588,24 @@ describe('<AiPanel /> — panel chrome', () => {
     expect(sendButton()).toBeDisabled();
   });
 });
+
+describe('<AiPanel /> — request failures', () => {
+  it('renders a visible error note when the provider stream dies before any text', async () => {
+    seedSettings({ provider: 'openai', baseUrl: 'https://api.example.com/v1', model: 'gpt-test' });
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))));
+    const editor = createFakeEditor('# Doc');
+    render(<AiPanel editor={editor} t={t} lang="en" />);
+
+    await awaitComposerReady();
+    await userEvent.type(composer(), 'hello');
+    await userEvent.click(sendButton());
+
+    // The failed turn STAYS in the transcript with an alert — never a
+    // silently dropped bubble.
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/The request failed/);
+    // busy is released for a retry.
+    await userEvent.type(composer(), ' again');
+    await waitFor(() => expect(sendButton()).toBeEnabled());
+  });
+});

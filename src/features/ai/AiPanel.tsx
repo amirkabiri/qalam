@@ -96,6 +96,8 @@ interface ChatEntry {
   tools: ToolCallView[];
   diffs: PendingDiffView[];
   pending: boolean;
+  /** The run died before/without a reply — the bubble shows the failure. */
+  failed?: boolean;
 }
 
 /** A send captured before any await (the prompt + pinned edit target). */
@@ -242,8 +244,17 @@ function MessageBody({
       </div>
     );
   }
-  if (entry.text !== '') {
-    return <div className={styles.msgText}>{entry.text}</div>;
+  if (entry.text !== '' || entry.failed) {
+    return (
+      <>
+        {entry.text !== '' && <div className={styles.msgText}>{entry.text}</div>}
+        {entry.failed && (
+          <div className={`${styles.msgText} ${styles.msgError}`} role="alert">
+            {tt('aiRequestFailed')}
+          </div>
+        )}
+      </>
+    );
   }
   return null;
 }
@@ -542,6 +553,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
       });
 
       let final = '';
+      let streamFailed = false;
       try {
         for await (const ev of agent.run(prompt)) {
           if (ev.type === 'text') {
@@ -593,17 +605,25 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
           }
         }
       } catch (err) {
+        // agent.run rethrows only when the stream died before producing
+        // anything — the turn must be VISIBLE as a failure, never dropped.
+        streamFailed = true;
         console.error('[ai] request failed', err);
       }
 
-      // Finalize; drop an empty tool-free bubble (legacy "Working…" cleanup).
+      // Finalize; drop an empty tool-free bubble (legacy "Working…" cleanup)
+      // — but a failed run always stays, with the error note rendered.
       setMessages((prev) => {
         const target = prev.find((m) => m.id === assistantId);
         const finished = prev.map((m) => {
           if (m.id !== assistantId) return m;
-          return { ...m, text: final, pending: false };
+          return streamFailed
+            ? { ...m, text: final, pending: false, failed: true }
+            : { ...m, text: final, pending: false };
         });
-        const empty = final === '' && (target?.tools.length ?? 0) === 0;
+        const empty = !streamFailed
+          && final === ''
+          && (target?.tools.length ?? 0) === 0;
         return empty ? finished.filter((m) => m.id !== assistantId) : finished;
       });
     } finally {

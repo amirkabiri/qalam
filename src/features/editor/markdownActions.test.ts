@@ -5,7 +5,7 @@
 // every case is a (text, range, action) → (text, range) triple (node project).
 import { describe, expect, it } from 'vitest';
 
-import { applyAction } from './markdownActions';
+import { applyAction, getSelectionFormatting } from './markdownActions';
 import type { FormatAction } from './markdownActions';
 
 /** Apply `action` and return just the resulting document text. */
@@ -320,5 +320,167 @@ describe('prefix actions on an empty (caret-only) selection', () => {
       selStart: 0,
       selEnd: 5,
     });
+  });
+});
+
+describe('toggle: selection strictly INSIDE existing markers (t_d18b34b2)', () => {
+  it('bold unwraps when the selection sits inside the bold span', () => {
+    // One word of an already-bold sentence — the regression: this used to
+    // wrap a SECOND **…** pair around the word.
+    expect(applyAction('**hello world**', 8, 13, 'bold')).toEqual({
+      text: 'hello world',
+      selStart: 6,
+      selEnd: 11,
+    });
+  });
+
+  it('the reported journey: bold → re-select the same text → bold unwraps', () => {
+    const first = applyAction('plain text here', 6, 10, 'bold');
+    expect(first.text).toBe('plain **text** here');
+    // Re-select exactly the same word inside the new text (the user's
+    // second selection — strictly inside the markers).
+    const second = applyAction(first.text, 8, 12, 'bold');
+    expect(second.text).toBe('plain text here');
+    expect([second.selStart, second.selEnd]).toEqual([6, 10]);
+  });
+
+  it('bold toggles a mid-sentence word off and the rest of the sentence stays bold', () => {
+    expect(applyAction('**stay** mid **stay**', 10, 13, 'bold').text)
+      .toBe('**stay** mid stay');
+  });
+
+  it('italic unwraps strictly-inside selections (both * and _)', () => {
+    expect(applyAction('a *raw* b', 4, 7, 'italic').text).toBe('a raw b');
+    expect(applyAction('a _raw_ b', 4, 7, 'italic').text).toBe('a raw b');
+  });
+
+  it('strikethrough and inline code unwrap strictly-inside selections', () => {
+    expect(applyAction('a ~~gone~~ b', 4, 8, 'strikethrough').text).toBe('a gone b');
+    expect(applyAction('a `raw` b', 3, 6, 'inlineCode').text).toBe('a raw b');
+  });
+
+  it('italic inside bold is not bold-confused: **bold** + italic → ***bold***', () => {
+    expect(applyAction('**bold**', 2, 6, 'italic')).toEqual({
+      text: '***bold***',
+      selStart: 3,
+      selEnd: 7,
+    });
+  });
+
+  it('***both*** unwraps ONE layer per action (bold leaves italic, and back)', () => {
+    const inner = applyAction('***x***', 3, 4, 'bold');
+    expect(inner.text).toBe('*x*');
+    expect(applyAction(inner.text, 2, 3, 'italic').text).toBe('x');
+    // The italic-first direction too.
+    expect(applyAction('***x***', 3, 4, 'italic').text).toBe('**x**');
+  });
+
+  it('unifies a PARTIALLY bold selection (bold extends over the rest)', () => {
+    expect(applyAction('**bo**ld', 0, 6, 'bold')).toEqual({
+      text: '**bold**',
+      selStart: 2,
+      selEnd: 6,
+    });
+  });
+
+  it('unifies several bold spans in the selection into one', () => {
+    expect(applyAction('**aa** bb **cc**', 0, 16, 'bold')).toEqual({
+      text: '**aa bb cc**',
+      selStart: 2,
+      selEnd: 10,
+    });
+  });
+
+  it('two adjacent italic spans do not read as a pair around the gap', () => {
+    // The space between them is not italic — a click must not delete
+    // the neighboring markers.
+    expect(applyAction('*a* *b*', 3, 4, 'italic').text).toBe('*a* * *b*');
+    expect(getSelectionFormatting('*a* *b*', 3, 4).italic).toBe(false);
+  });
+
+  it('intraword underscores are not emphasis (CommonMark)', () => {
+    expect(applyAction('foo_bar_baz', 4, 7, 'italic').text).toBe('foo_bar*bar*baz');
+  });
+
+  it('bold never crosses a blank line', () => {
+    // 'a' bolded, 'b' plain: selecting both lines must not unwrap across
+    // the paragraph break — it wraps each line's own context instead.
+    const result = applyAction('**a**\n\nb', 2, 7, 'bold');
+    expect(result.text).toBe('a\n\n**b**');
+  });
+
+  it('the full toolbar toggle matrix is idempotent through re-selection', () => {
+    // wrap → re-select the core in the new text → same action unwraps it.
+    const cases: [string, number, number, FormatAction][] = [
+      ['say bold words', 4, 8, 'bold'],
+      ['say italic words', 4, 10, 'italic'],
+      ['say gone words', 4, 8, 'strikethrough'],
+      ['say code words', 4, 8, 'inlineCode'],
+    ];
+    for (const [text, start, end, action] of cases) {
+      const once = applyAction(text, start, end, action);
+      const word = text.slice(start, end);
+      const lo = once.text.indexOf(word);
+      const twice = applyAction(once.text, lo, lo + word.length, action);
+      expect(twice.text).toBe(text);
+    }
+  });
+});
+
+describe('getSelectionFormatting (toolbar active states)', () => {
+  it('a plain selection is active for nothing', () => {
+    expect(getSelectionFormatting('hello world', 6, 11)).toEqual({
+      bold: false,
+      italic: false,
+      strikethrough: false,
+      inlineCode: false,
+      link: false,
+      heading2: false,
+      heading3: false,
+      bulletList: false,
+      numberedList: false,
+      taskList: false,
+      blockquote: false,
+      codeBlock: false,
+    });
+  });
+
+  it('bold reads true strictly inside **…**, italic stays false', () => {
+    expect(getSelectionFormatting('**bold**', 2, 6)).toMatchObject({ bold: true, italic: false });
+    // Markers fully included in the selection count too (the strip case).
+    expect(getSelectionFormatting('**bold**', 0, 8).bold).toBe(true);
+  });
+
+  it('***both*** reads as bold AND italic', () => {
+    expect(getSelectionFormatting('***x***', 3, 4)).toMatchObject({ bold: true, italic: true });
+  });
+
+  it('_ underscores count for italic on word boundaries only', () => {
+    expect(getSelectionFormatting('a _em_ b', 3, 5).italic).toBe(true);
+    expect(getSelectionFormatting('foo_bar_baz', 4, 7).italic).toBe(false);
+  });
+
+  it('a link label reads link=true', () => {
+    expect(getSelectionFormatting('go [docs](https://x.io) now', 4, 8).link).toBe(true);
+    expect(getSelectionFormatting('go [docs](https://x.io) now', 0, 2).link).toBe(false);
+  });
+
+  it('prefix actions read active only when EVERY non-empty line carries them', () => {
+    expect(getSelectionFormatting('- a\n- b', 0, 5)).toMatchObject({ bulletList: true });
+    expect(getSelectionFormatting('- a\nb', 0, 4)).toMatchObject({ bulletList: false });
+    expect(getSelectionFormatting('1. a\n2. b', 0, 9)).toMatchObject({ numberedList: true });
+    expect(getSelectionFormatting('- [ ] a', 0, 7)).toMatchObject({ taskList: true });
+    expect(getSelectionFormatting('> a\n> b', 0, 6)).toMatchObject({ blockquote: true });
+    expect(getSelectionFormatting('## a\n## b', 0, 9)).toMatchObject({ heading2: true, heading3: false });
+    expect(getSelectionFormatting('### a', 0, 5)).toMatchObject({ heading3: true });
+  });
+
+  it('a fenced block selection reads codeBlock=true', () => {
+    expect(getSelectionFormatting('x\n\n```\nfoo\n```\n\ny', 4, 11)).toMatchObject({ codeBlock: true });
+  });
+
+  it('a caret selection is active for nothing', () => {
+    const state = getSelectionFormatting('**bold**', 4, 4);
+    expect(Object.values(state).every((v) => v === false)).toBe(true);
   });
 });

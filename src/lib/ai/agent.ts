@@ -352,7 +352,10 @@ export function createAgent(deps: AgentDeps) {
         // Stream one assistant turn, mirroring the qalam-stripped snapshot.
         // A mid-stream failure keeps the partial reply (it likely has no tool
         // call, so it becomes the final answer) instead of losing the turn.
+        // A stream that dies before producing ANYTHING is not an empty
+        // answer — it is rethrown so the caller can surface the failure.
         let reply = '';
+        let streamError: unknown = null;
         try {
           const iterator = deps.provider.stream(convo, opts)[Symbol.asyncIterator]();
           for (;;) {
@@ -365,11 +368,13 @@ export function createAgent(deps: AgentDeps) {
           }
         } catch (err) {
           console.warn('[ai] agent stream failed', err);
+          streamError = err;
         }
 
         const calls = extractToolCalls(reply);
 
         if (calls.length === 0 && !QALAM_OPEN.test(reply)) {
+          if (reply === '' && streamError !== null) throw streamError;
           yield { type: 'done', text: stripToolBlocks(reply) }; // plain Markdown → final answer
           return;
         }
