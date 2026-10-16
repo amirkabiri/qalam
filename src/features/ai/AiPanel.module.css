@@ -371,9 +371,8 @@
 }
 
 .msgText {
-  font-family: var(--mono);
-  font-size: 12.5px;
-  line-height: 1.85;
+  font-size: 13.5px;
+  line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--text);
