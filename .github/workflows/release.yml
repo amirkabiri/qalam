@@ -1,0 +1,50 @@
+# Automatic releases on every push to main: Conventional Commits drive the
+# semver bump; a release (tag + GitHub Release + CHANGELOG.md) is cut only
+# when the new commits contain a feat/fix. The `release: published` event
+# re-runs the Pages deploy so the deployed app always matches the latest
+# release (see deploy.yml).
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# Never cut two releases concurrently; queue instead of cancelling so a
+# queued push still releases after the in-flight one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # tags + releases + the chore(release) commit
+  issues: write # semantic-release failure/issue comments
+
+jobs:
+  release:
+    name: Semantic release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # semantic-release needs the full history to diff since the last tag
+          # and must be able to push the release commit back to main.
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: qalam-release-bot
+          GIT_AUTHOR_EMAIL: qalam-release-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: qalam-release-bot
+          GIT_COMMITTER_EMAIL: qalam-release-bot@users.noreply.github.com
+        run: pnpm exec semantic-release

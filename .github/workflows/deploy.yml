@@ -7,6 +7,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # The release workflow (release.yml) cuts a tag + GitHub Release on main;
+  # redeploy so Pages always serves the released version.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
