@@ -50,8 +50,6 @@ import {
   ProgressBar,
   TextArea,
 } from 'react-aria-components';
-import { createAgent } from '../../lib/ai/agent';
-import type { ToolExecutor } from '../../lib/ai/agent';
 import { isForeignLayerOpen } from '../../app/shortcuts';
 import {
   isExternalReady,
@@ -59,44 +57,25 @@ import {
   normalizeSettings,
   saveSettings,
 } from '../../lib/ai/settings';
-import type { ChatProvider, ProviderSettings } from '../../lib/ai/types';
+import type { ProviderSettings } from '../../lib/ai/types';
 import type { EditorApi } from '../editor/api';
 import type { Lang } from '../../i18n';
-import { buildChatMessages } from './chat';
 import createExternalProvider from './chat-provider';
 import ConsentDialog from './ConsentDialog';
 import AiSettingsForm from './AiSettingsForm';
 import type { ProviderDraft } from './AiSettingsForm';
-import ToolActivity, { statusForOutcome } from './ToolActivity';
-import type { ToolCallStatus } from './ToolActivity';
+import ToolActivity from './ToolActivity';
 import PendingDiffCard from './PendingDiffCard';
-import type { PendingDiffView } from './pendingDiff';
-import { applyPendingDiff, createToolExecutor } from './executor';
-import { lineRangeOfOffset } from '../../lib/ai/tool-results';
-import {
-  canAttempt as canAttemptProvider,
-  loadingLabelFor,
-  planProvider,
-} from './providerResolution';
-import {
-  planApplyDiff,
-  planDiscardDiff,
-} from './diffResolution';
-import type { DiffResolutionRecord } from './diffResolution';
-import {
-  appendSendPair,
-  applyAgentText,
-  applyAgentToolResult,
-  applyAgentToolStart,
-  finalizeRun,
-  settleDiff,
-} from './chatTranscript';
+import { createToolExecutor } from './executor';
+import { canAttempt as canAttemptProvider } from './providerResolution';
 import type { ChatEntry } from './chatTranscript';
 import { aiToast } from './toast-queue';
 import { previewExcerptQueue } from './previewExcerpt';
 import type { PreviewExcerptPayload } from './previewExcerpt';
 import { useBuiltinAi } from './useBuiltinAi';
 import type { BuiltinAi } from './useBuiltinAi';
+import { useChatSession } from './useChatSession';
+import type { PendingSend } from './useChatSession';
 import styles from './AiPanel.module.css';
 
 export interface AiPanelProps {
@@ -106,15 +85,6 @@ export interface AiPanelProps {
   t: (key: string) => string;
   /** Active UI language — drives the kit's RTL direction and local digits. */
   lang: Lang;
-}
-
-/** A send captured before any await (the prompt + pinned edit target). */
-interface PendingSend {
-  question: string;
-  docText: string;
-  pinnedRange: [number, number] | null;
-  /** Preview-selection context attached at send time (consumed on send). */
-  excerpt: PreviewExcerptPayload | null;
 }
 
 interface SelectionChipState {
@@ -283,24 +253,10 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
       model: initial.model,
     };
   });
-  const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
-  const busyRef = useRef(false);
-  const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [consentDeclined, setConsentDeclined] = useState(false);
   const pendingSendRef = useRef<PendingSend | null>(null);
-  const lastExternalRef = useRef<ChatProvider | null>(null);
-  /** How the previous turn's proposed edit was resolved — fed to the next
-   *  prompt so the model never re-proposes a discarded edit (spec §5.4). */
-  const resolutionRef = useRef<DiffResolutionRecord | null>(null);
-  const nextIdRef = useRef(1);
-  const nextId = (): number => {
-    const id = nextIdRef.current;
-    nextIdRef.current += 1;
-    return id;
-  };
 
   const builtin = useBuiltinAi();
 
@@ -354,18 +310,6 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
 
   // Auto-scroll the message list to the newest content.
   const messagesRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = messagesRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, loadingLabel]);
-
-  // Free the in-flight external provider when the panel goes away (legacy
-  // pagehide); the builtin session is destroyed by useBuiltinAi's cleanup.
-  useEffect(() => () => {
-    const { current: last } = lastExternalRef;
-    if (last?.destroy) trap(Promise.resolve(last.destroy()));
-    lastExternalRef.current = null;
-  }, []);
 
   const updateSettings = (next: ProviderSettings): void => {
     settingsRef.current = next;
@@ -420,160 +364,34 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
    * refusal). Small writes auto-apply through the frozen applyEdit mechanism
    * (one splice = one undo step); larger ones come back as PENDING diffs.
    */
-  const makeExecutor = (directEditOn: boolean): ToolExecutor => createToolExecutor(editor, {
+  const makeExecutor = (directEditOn: boolean) => createToolExecutor(editor, {
     directEdit: directEditOn,
     withEditorAccess,
   });
 
-  /** Gate + construct the ACTIVE provider; explains why when refused. */
-  const resolveProvider = async (
-    currentSettings: ProviderSettings,
-  ): Promise<ChatProvider | null> => {
-    const plan = planProvider(currentSettings, { supported: builtin.provider.supported });
-    if (plan.action === 'refuse') {
-      aiToast(tt(plan.toastKey), 'error');
-      return null;
-    }
-    if (plan.action === 'builtin') {
-      // The possibly-long LanguageModel.create() runs under the loading label.
-      const session = await builtin.provider.ensureSession();
-      if (!session) {
-        aiToast(tt('aiUnavailableExplainer'), 'error');
-        trap(builtin.refresh());
-        return null;
-      }
-      return builtin.provider;
-    }
-    const provider = createExternalProvider(currentSettings);
-    lastExternalRef.current = provider;
-    return provider;
-  };
+  // The chat run state (transcript, busy, loading label, §5.4 resolution
+  // feed) and the send pipeline live in the useChatSession controller; the
+  // panel supplies the environment: settings, translator, the builtin
+  // machine, and the editor access bridge. Rendering stays here.
+  const chat = useChatSession({
+    tt,
+    getSettings: () => settingsRef.current,
+    builtin: builtin.provider,
+    refreshBuiltin: builtin.refresh,
+    createExternal: createExternalProvider,
+    makeExecutor,
+    editor,
+    withEditorAccess,
+    clearDraft: () => setDraft(''),
+    clearExcerpt: () => setExcerpt(null),
+  });
+  const { messages, busy, loadingLabel } = chat;
 
-  /** Applies one pending diff (card Apply). Content-anchored diffs re-anchor
-   *  on the live document; line-anchored ones refuse when it moved. */
-  const applyDiff = (assistantId: number, diff: PendingDiffView): void => {
-    const result = applyPendingDiff(editor, diff, withEditorAccess);
-    const outcome = planApplyDiff(diff, result);
-    if (outcome.resolution) resolutionRef.current = outcome.resolution;
-    aiToast(tt(outcome.toastKey), outcome.toastKind);
-    setMessages((prev) => settleDiff(
-      prev,
-      assistantId,
-      diff.stepId,
-      diff.id,
-      outcome.settleStatus,
-    ));
-  };
-
-  /** Discards one pending diff — reported back on the next send so the model
-   *  never re-proposes blindly (spec §5.4). */
-  const discardDiff = (assistantId: number, diff: PendingDiffView): void => {
-    const outcome = planDiscardDiff(diff);
-    resolutionRef.current = outcome.resolution;
-    aiToast(tt(outcome.toastKey), outcome.toastKind);
-    setMessages((prev) => settleDiff(
-      prev,
-      assistantId,
-      diff.stepId,
-      diff.id,
-      outcome.settleStatus,
-    ));
-  };
-
-  /** Runs one send end-to-end against the agent loop. */
-  const performSend = async (req: PendingSend): Promise<void> => {
-    const { current: currentSettings } = settingsRef;
-    const readOnly = currentSettings.directEdit !== true;
-    busyRef.current = true;
-    setBusy(true);
-    // Visible, labeled loading from NOW until the first streamed event.
-    setLoadingLabel(loadingLabelFor(currentSettings, tt));
-    try {
-      const provider = await resolveProvider(currentSettings);
-      if (!provider) return; // reason surfaced; the draft stays in the composer
-
-      setDraft('');
-      const hasSelection = req.pinnedRange !== null;
-      const selected = hasSelection && req.pinnedRange
-        ? req.docText.slice(req.pinnedRange[0], req.pinnedRange[1])
-        : '';
-      const selectionLines = hasSelection && req.pinnedRange
-        ? lineRangeOfOffset(req.docText, req.pinnedRange[0], req.pinnedRange[1])
-        : null;
-      const resolution = resolutionRef.current;
-      resolutionRef.current = null; // it describes exactly the previous turn
-      const prompt = buildChatMessages({
-        question: req.question,
-        hasSelection,
-        selected,
-        docText: req.docText,
-        readOnly,
-        excerpt: req.excerpt ?? undefined,
-        selectionLines,
-        resolution,
-      });
-      if (req.excerpt) setExcerpt(null); // context is now part of the message
-      const userId = nextId();
-      const assistantId = nextId();
-      setMessages((prev) => appendSendPair(prev, userId, assistantId, req.question));
-
-      const agent = createAgent({
-        provider,
-        executor: makeExecutor(!readOnly),
-      });
-
-      let final = '';
-      let streamFailed = false;
-      try {
-        for await (const ev of agent.run(prompt)) {
-          if (ev.type === 'text') {
-            setLoadingLabel(null); // first event → loading phase over
-            setMessages((prev) => applyAgentText(prev, assistantId, ev.text));
-          } else if (ev.type === 'tool') {
-            setLoadingLabel(null);
-            setMessages((prev) => applyAgentToolStart(prev, assistantId, {
-              id: nextId(),
-              tool: ev.tool,
-              status: 'running',
-            }));
-          } else if (ev.type === 'tool-result') {
-            setLoadingLabel(null);
-            const { outcome } = ev;
-            const stepStatus: ToolCallStatus = statusForOutcome(outcome);
-            const diff = outcome.status === 'pending'
-              ? {
-                id: nextId(),
-                stepId: -1, // settled against the matching running step
-                data: outcome.diff,
-                docAtProposal: editor.getText(),
-              }
-              : null;
-            setMessages((prev) => applyAgentToolResult(prev, {
-              assistantId,
-              status: stepStatus,
-              tool: ev.tool,
-              diff,
-            }));
-          } else {
-            final = ev.text;
-          }
-        }
-      } catch (err) {
-        // agent.run rethrows only when the stream died before producing
-        // anything — the turn must be VISIBLE as a failure, never dropped.
-        streamFailed = true;
-        console.error('[ai] request failed', err);
-      }
-
-      // Finalize; drop an empty tool-free bubble (legacy "Working…" cleanup)
-      // — but a failed run always stays, with the error note rendered.
-      setMessages((prev) => finalizeRun(prev, assistantId, final, streamFailed));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-      setLoadingLabel(null);
-    }
-  };
+  // Auto-scroll the message list to the newest content.
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loadingLabel]);
 
   /** The consent-gated download (explicit user activation ONLY). */
   const startDownloadFlow = async (): Promise<void> => {
@@ -583,7 +401,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
       setConsentDeclined(false);
       if (req) {
         pendingSendRef.current = null;
-        await performSend(req); // proceed with the message the user sent
+        await chat.performSend(req); // proceed with the message the user sent
       }
     } else {
       trap(builtin.refresh()); // status area reflects reality
@@ -607,13 +425,13 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
 
   const handleSend = async (): Promise<void> => {
     const question = draft.trim();
-    if (!question || busyRef.current) return;
+    if (!question || chat.isBusy()) return;
     // Resolve a 'checking' machine state first (its verdict decides consent).
     let { availability } = builtin;
     if (settingsRef.current.provider === 'builtin' && availability === 'checking') {
       availability = await builtin.refresh();
     }
-    if (busyRef.current) return;
+    if (chat.isBusy()) return;
 
     // Pin the document/selection BEFORE any await: it decides the prompt
     // (whole-document vs selection-aware) and the pinned edit target.
@@ -635,7 +453,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
       return;
     }
 
-    await performSend({
+    await chat.performSend({
       question, docText, pinnedRange, excerpt: attachedExcerpt,
     });
   };
@@ -705,8 +523,8 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
                       key={diff.id}
                       diff={diff}
                       tt={tt}
-                      onApply={() => applyDiff(message.id, diff)}
-                      onDiscard={() => discardDiff(message.id, diff)}
+                      onApply={() => chat.applyDiff(message.id, diff)}
+                      onDiscard={() => chat.discardDiff(message.id, diff)}
                     />
                   ))}
                   <MessageBody
