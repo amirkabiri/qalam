@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 import { I18nProvider, useT } from './app/i18n';
+import ErrorBoundary from './app/ErrorBoundary';
 import { PersistenceProvider, useDocumentRepository } from './app/persistence';
 import { ThemeProvider, useTheme } from './app/theme';
 import { ToastProvider, useToast } from './components/Toast';
@@ -369,7 +370,11 @@ export default function App() {
       <ThemeProvider>
         <ToastProvider>
           <PersistenceProvider>
-            <Shell lang={lang} onToggleLang={toggleLang} />
+            {/* One render error must not blank the app: the boundary keeps a
+               minimal recovery UI (retry remounts the whole shell). */}
+            <ErrorBoundary>
+              <Shell lang={lang} onToggleLang={toggleLang} />
+            </ErrorBoundary>
           </PersistenceProvider>
         </ToastProvider>
       </ThemeProvider>
