@@ -115,3 +115,23 @@ One task per finding, priority 1 (P0) / 2 (P1) / 3 (P2), P2 tasks parked with
 kanban mutations are fenced — the parent (or any unrestricted session) runs
 the script once to create the tasks; the implementing worker claims them with
 `hermes kanban claim <id>`.
+
+## 4. Execution log / incident notes
+
+- **2026-10-16, commit `8eedd95` — accidental sweep of in-flight editor
+  work.** A `git add -A` before the F1 commit picked up the toggle agent's
+  UNCOMMITTED WIP under `src/features/editor/` (RED-phase TDD tests for
+  t_d18b34b2 included), pushing it to main with my AI-fix files. No edits
+  were made to their files and no work was lost — the agent completed
+  t_d18b34b2 on top of it (commit `99648d5`, task status: done) — but main
+  was red between the sweep and their completion. Rule adopted: stage files
+  explicitly, never `-A`.
+- **2026-10-16, F8 (`4d7c99a`) — first cut of `byteLengthOver` was
+  unsound.** The initial implementation used a `text.length <= max` fast
+  path, which is invalid for multi-byte text (Persian letters are 2 UTF-8
+  bytes; a sub-cap unit count can still be over the byte cap). The failing
+  test caught it before push; the landed version is a byte-exact counting
+  scan (no allocation, early bail), with a test oracle
+  (`encodedByteLength`) pinning it against the real encoder. Kanban task
+  comments could not be posted from this context (delegate children are
+  fenced from board writes) — this log is the record.
