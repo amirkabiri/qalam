@@ -5,13 +5,28 @@
 // sanitized-output contract, TOC/anchor building, mermaid extraction and
 // link/image enhancement are pinned here.
 
-import { describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  describe, expect, it,
+} from 'vitest';
+import hljs from 'highlight.js/lib/common';
 import {
   RENDER_DEBOUNCE_MS,
   isDocLink,
   mermaidConfig,
   renderMarkdown,
 } from './markdown';
+import { setHighlighter } from './highlight';
+
+// The render pipeline highlights through the LAZY highlight module (the
+// entry bundle must not carry highlight.js); tests inject it explicitly.
+beforeAll(() => {
+  setHighlighter(hljs);
+});
+afterAll(() => {
+  setHighlighter(null);
+});
 
 const BASE = 'https://example.github.io/markdown-viewer/docs/notes.md';
 
@@ -118,6 +133,17 @@ describe('renderMarkdown — tables and code', () => {
     const { html } = renderMarkdown('```js\nconst a = 1;\n```\n');
     expect(html).toContain('hljs');
     expect(html).toContain('<span class="hljs-keyword">const</span>');
+  });
+
+  it('leaves code blocks plain while the lazy highlighter has not loaded', () => {
+    setHighlighter(null);
+    try {
+      const { html } = renderMarkdown('```js\nconst a = 1;\n```\n');
+      expect(html).not.toContain('hljs-');
+      expect(html).toContain('<code');
+    } finally {
+      setHighlighter(hljs);
+    }
   });
 
   it('extracts mermaid blocks into .mermaid-block shells without rendering them', () => {

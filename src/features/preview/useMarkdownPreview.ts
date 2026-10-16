@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { MAX_INPUT_BYTES, byteLengthOver } from '../../lib/store';
+import { loadHighlighter } from '../../lib/highlight';
 import { RENDER_DEBOUNCE_MS, renderMarkdown } from '../../lib/markdown';
 import type { MarkdownTocEntry } from '../../lib/markdown';
 
@@ -46,6 +47,18 @@ export function useMarkdownPreview(
 ): MarkdownPreviewState {
   const [debounced, setDebounced] = useState(text);
   const [prevKey, setPrevKey] = useState(immediateKey);
+  /* highlight.js is lazy (entry-bundle diet): bump once when it lands so
+     code blocks rendered plain in the meantime re-render highlighted. */
+  const [highlightTick, setHighlightTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    loadHighlighter().then((hljs) => {
+      if (hljs && live) setHighlightTick((n) => n + 1);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // Document switch: render immediately, like legacy setDoc (adjusting state
   // during render — the React-endorsed derived-reset pattern). Typing goes
@@ -72,5 +85,8 @@ export function useMarkdownPreview(
       error: result.error ?? null,
       tooLarge: false,
     };
-  }, [debounced, baseUrl]);
+  // highlightTick is a re-render trigger, not memo input: when the lazy
+  // highlighter lands, already-rendered plain code blocks must re-render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounced, baseUrl, highlightTick]);
 }

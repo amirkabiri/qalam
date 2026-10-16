@@ -19,7 +19,7 @@
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import hljs from 'highlight.js/lib/common';
+import { highlighter } from './highlight';
 import { slugify } from './store';
 
 /** Legacy preview debounce, kept for the React render effect. */
@@ -173,7 +173,10 @@ export function renderMarkdown(text: string, opts: RenderOptions = {}): Rendered
     wrap.appendChild(tbl);
   });
 
-  /* Code blocks: highlight + collect mermaid blocks. */
+  /* Code blocks: highlight + collect mermaid blocks. When highlight.js has
+     not finished lazy-loading yet, blocks render plain (an enhancement,
+     never a requirement) — the preview re-renders once the load resolves. */
+  const hljs = highlighter();
   const mermaid: string[] = [];
   doc.querySelectorAll('pre > code').forEach((code) => {
     const lang = (code.className.match(LANG_RE) || [])[1];
@@ -185,7 +188,7 @@ export function renderMarkdown(text: string, opts: RenderOptions = {}): Rendered
       mermaid.push(shell.textContent ?? '');
       return;
     }
-    if (lang && hljs.getLanguage(lang)) {
+    if (lang && hljs && hljs.getLanguage(lang)) {
       try {
         hljs.highlightElement(code as HTMLElement);
       } catch { /* leave plain */ }
