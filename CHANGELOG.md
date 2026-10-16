@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/amirkabiri/qalam/compare/v1.1.0...v1.1.1) (2026-10-16)
+
+### Bug Fixes
+
+* **test:** move the shortcut drift contract to docs/SHORTCUTS.md ([e940cdb](https://github.com/amirkabiri/qalam/commit/e940cdbb5051fb7a89c2e915e144b85c0a5c6dc9))
+
 ## [1.1.0](https://github.com/amirkabiri/qalam/compare/v1.0.1...v1.1.0) (2026-10-16)
 
 ### Features
