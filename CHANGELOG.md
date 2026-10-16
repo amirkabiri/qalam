@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/amirkabiri/qalam/compare/v1.0.1...v1.1.0) (2026-10-16)
+
+### Features
+
+* **ui:** add the What's New changelog dialog ([d442538](https://github.com/amirkabiri/qalam/commit/d4425388801e1b4f3849e64046268865e26e226b))
+
 ## [1.0.1](https://github.com/amirkabiri/qalam/compare/v1.0.0...v1.0.1) (2026-10-16)
 
 ### Bug Fixes
