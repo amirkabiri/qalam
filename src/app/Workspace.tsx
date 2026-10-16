@@ -158,6 +158,7 @@ export default function Workspace({
   }, []);
 
   /* Editor <-> preview scroll sync (legacy bindScrollSync). */
+  const scrollLockRef = useRef(0);
   useEffect(() => {
     const workspace = workspaceRef.current;
     const previewScroll = previewScrollRef.current;
@@ -165,18 +166,17 @@ export default function Workspace({
     const editorEl = workspace.querySelector('textarea');
     if (!editorEl) return undefined;
 
-    let lockUntil = 0;
     const fraction = (el: HTMLElement) => el.scrollTop
       / Math.max(1, el.scrollHeight - el.clientHeight);
     const onEditorScroll = () => {
-      if (modeRef.current !== 'split' || Date.now() < lockUntil) return;
-      lockUntil = Date.now() + SCROLL_LOCK_MS;
+      if (modeRef.current !== 'split' || Date.now() < scrollLockRef.current) return;
+      scrollLockRef.current = Date.now() + SCROLL_LOCK_MS;
       previewScroll.scrollTop = fraction(editorEl)
         * Math.max(0, previewScroll.scrollHeight - previewScroll.clientHeight);
     };
     const onPreviewScroll = () => {
-      if (modeRef.current !== 'split' || Date.now() < lockUntil) return;
-      lockUntil = Date.now() + SCROLL_LOCK_MS;
+      if (modeRef.current !== 'split' || Date.now() < scrollLockRef.current) return;
+      scrollLockRef.current = Date.now() + SCROLL_LOCK_MS;
       editorEl.scrollTop = fraction(previewScroll)
         * Math.max(0, editorEl.scrollHeight - editorEl.clientHeight);
     };
@@ -187,6 +187,25 @@ export default function Workspace({
       previewScroll.removeEventListener('scroll', onPreviewScroll);
     };
   }, []);
+
+  /* A document switch resets both panes; the echo lock must not outlive the
+     switch. A lock stamped by pre-switch scrolling (panel open/close churn,
+     textarea clamps) otherwise eats the reset's mirror into the editor and
+     the editor legitimately stays scrolled at the old fraction. Clearing
+     here lets the switch's own reset scroll mirror through the normal sync. */
+  useEffect(() => {
+    scrollLockRef.current = 0;
+  }, [docIdentity]);
+
+  /* The editor pane resets EXPLICITLY on a document switch. Relying on the
+     preview reset's mirror is fragile: the switch's own layout churn can
+     scroll a pane inside the 60 ms echo-lock window and eat the mirror
+     (webkit under load did exactly that), leaving the editor at the old
+     fraction. A switch is not an echo — both panes go to the top. */
+  useEffect(() => {
+    const editorEl = workspaceRef.current?.querySelector('textarea');
+    if (editorEl) editorEl.scrollTop = 0;
+  }, [docIdentity]);
 
   const splitStyle = savedSplit
     ? ({ '--split': savedSplit } as CSSProperties)
