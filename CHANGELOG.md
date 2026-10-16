@@ -1,3 +1,11 @@
+## [1.1.4](https://github.com/amirkabiri/qalam/compare/v1.1.3...v1.1.4) (2026-10-16)
+
+### Bug Fixes
+
+* **ai:** set chat bubbles in the interface font ([69f8e80](https://github.com/amirkabiri/qalam/commit/69f8e8041fa90e3f30e8949a4563fed92269d9a9))
+* **ui:** keep the topbar inside narrow viewports ([d9fb59b](https://github.com/amirkabiri/qalam/commit/d9fb59b8d9aa852a6a32f161617f0d0b15729428))
+* **ui:** style the ErrorBoundary retry button ([b2f1e44](https://github.com/amirkabiri/qalam/commit/b2f1e44413269a8745967dc58e33bf391046d151))
+
 ## [1.1.3](https://github.com/amirkabiri/qalam/compare/v1.1.2...v1.1.3) (2026-10-16)
 
 ### Bug Fixes
