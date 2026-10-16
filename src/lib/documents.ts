@@ -74,4 +74,3 @@ export function prettyName(u: string, base?: string): string {
 export function hasShareHash(hash: string): boolean {
   return hash.startsWith('#d=');
 }
-
