@@ -26,6 +26,9 @@ import { createHiddenMirror, syncMirrorTypography } from './textareaMirror';
 export interface CaretPoint {
   x: number;
   y: number;
+  /** Bottom of the caret's inline box — the bottom edge of the caret's
+   *  LINE, for placing a menu BELOW the selection (viewport-top flip). */
+  lineBottom: number;
 }
 
 /**
@@ -87,6 +90,7 @@ export function createDomCaretMeasurer(textarea: HTMLTextAreaElement): CaretMeas
       return {
         x: rect.left - wrapRect.left,
         y: rect.top - wrapRect.top - el.scrollTop,
+        lineBottom: rect.bottom - wrapRect.top - el.scrollTop,
       };
     },
 

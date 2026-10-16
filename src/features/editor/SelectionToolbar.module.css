@@ -1,42 +1,59 @@
-/* The selection toolbar's floating menu — visual language from the global
-   tokens (same popover treatment as the documents list menu), plus the
-   hidden 0×0 anchor that positions it at the selection. */
+/* The selection toolbar — a SMALL HORIZONTAL inline toolbar (Notion-style)
+   floating just above the selection rectangle (below it when flipped), in
+   the global tokens' visual language (same popover treatment as the
+   documents list menu). It is positioned by SelectionToolbar.tsx: `left` is
+   the (clamped) selection-start x, `top` the anchor y, and data-placement
+   picks the translateY direction — so this file only owns the look. */
 
-/* Invisible anchor at the selection-start caret point (wrapper-relative,
-   scroll-corrected by caretGeometry). Never focusable, never visible. */
-.anchor {
+.toolbar {
   position: absolute;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  user-select: none;
-}
-
-.popover {
+  z-index: 30;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 4px;
-  min-width: 150px;
+  max-width: 100%;
 }
 
-.menu {
-  display: flex;
-  flex-direction: column;
-  outline: none;
-}
-
-.menuItem {
-  padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
   color: var(--text);
+  font-family: var(--editor-font, monospace);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
   white-space: nowrap;
 }
 
-.menuItem[data-focused],
-.menuItem:hover {
+.btn:hover,
+.btn:focus-visible {
   background: var(--bg-subtle);
+  outline: none;
+}
+
+/* Decorative glyphs (aria-label carries the accessible name). */
+.glyphBold {
+  font-weight: 700;
+}
+
+.glyphItalic {
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.glyphStrike {
+  text-decoration: line-through;
 }
