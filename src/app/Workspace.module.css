@@ -97,6 +97,18 @@
   background: var(--accent);
 }
 
+/* Keyboard-resize focus ring (the divider is a focusable separator). */
+.divider:focus-visible::after {
+  width: 3px;
+  inset-inline-start: 2px;
+  background: var(--accent);
+}
+
+.divider:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* --- Pane modes --- */
 
 .modeEditor .previewPane,

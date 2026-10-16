@@ -73,6 +73,44 @@ function setup(overrides: Partial<HarnessProps> = {}) {
   return props;
 }
 
+describe('<Workspace /> split divider', () => {
+  it('is a focusable separator with an exposed value and localized labels', () => {
+    setup();
+
+    const divider = screen.getByRole('separator', { name: 'Resize editor and preview panes' });
+    expect(divider).toHaveAttribute('aria-valuemin', '20');
+    expect(divider).toHaveAttribute('aria-valuemax', '80');
+    expect(divider).toHaveAttribute('title', 'Drag to resize · double-click to reset');
+  });
+
+  it('resizes by keyboard: ArrowRight grows the editor pane in LTR', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('mv:split', JSON.stringify('49.00%'));
+    setup();
+
+    const divider = screen.getByRole('separator');
+    expect(divider).toHaveAttribute('aria-valuenow', '49');
+    divider.focus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(divider).toHaveAttribute('aria-valuenow', '51');
+
+    await user.keyboard('{Home}'); // reset to the middle
+    expect(divider).toHaveAttribute('aria-valuenow', '50');
+  });
+
+  it('clamps keyboard resize at the documented max', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('mv:split', JSON.stringify('79.50%'));
+    setup();
+
+    const divider = screen.getByRole('separator');
+    divider.focus();
+    await user.keyboard('{ArrowRight}'); // would be 81.5 → clamped
+    expect(divider).toHaveAttribute('aria-valuenow', '80');
+  });
+});
+
 describe('<Workspace /> session banner + rename', () => {
   it('shows the readonly banner with Take over only for a readonly session', async () => {
     const props = setup({ docReadonly: true });

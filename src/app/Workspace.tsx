@@ -23,6 +23,9 @@ import type {
 
 import styles from './Workspace.module.css';
 
+/** Keyboard resize step (percent of the workspace width, per key press). */
+const SPLIT_STEP = 2;
+
 export interface WorkspaceProps {
   mode: PaneMode;
   editor: EditorController;
@@ -64,8 +67,33 @@ export default function Workspace({
   }, [mode]);
 
   const savedSplit = store.get<string | null>('split', null);
+  /** The initially-exposed separator value (pure — no ref access at render). */
+  const initialSplitPct = savedSplit
+    ? Math.round(parseFloat(savedSplit)) || 50
+    : 50;
 
-  /* Divider drag + double-click reset (legacy initDivider). */
+  /* Divider drag + double-click reset (legacy initDivider). The split value
+     lives in ONE helper so the pointer drag, keyboard resize and reset all
+     move the same CSS variable and persist identically. */
+  const setSplit = (frac: number): void => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    const clamped = Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, frac));
+    workspace.style.setProperty('--split', `${(clamped * 100).toFixed(2)}%`);
+    store.set('split', workspace.style.getPropertyValue('--split'));
+    // The value is exposed for AT: keep it in sync with the imperative move
+    // (this code path bypasses React state by design).
+    dividerRef.current?.setAttribute('aria-valuenow', String(Math.round(clamped * 100)));
+  };
+
+  /** The live split as a fraction (computed style — CSS var or the default). */
+  const readSplit = (): number => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return 0.5;
+    const raw = parseFloat(workspace.style.getPropertyValue('--split'));
+    return Number.isFinite(raw) ? raw / 100 : 0.5;
+  };
+
   useEffect(() => {
     const divider = dividerRef.current;
     const workspace = workspaceRef.current;
@@ -85,6 +113,12 @@ export default function Workspace({
       const up = () => {
         divider.classList.remove(styles.dragging);
         store.set('split', workspace.style.getPropertyValue('--split'));
+        // Expose the final pointer position to AT (setSplit's attribute sync,
+        // without clamping — move() already clamped).
+        const pct = parseFloat(workspace.style.getPropertyValue('--split'));
+        if (Number.isFinite(pct)) {
+          divider.setAttribute('aria-valuenow', String(Math.round(pct)));
+        }
         divider.removeEventListener('pointermove', move);
         divider.removeEventListener('pointerup', up);
       };
@@ -95,12 +129,31 @@ export default function Workspace({
       workspace.style.removeProperty('--split');
       store.set('split', null);
     };
+    /* Keyboard resize (a11y — role=separator per the APG): arrows move the
+       split by SPLIT_STEP%, direction-aware; Home resets to the middle. */
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (modeRef.current !== 'split') return;
+      const rtl = document.documentElement.dir === 'rtl';
+      const current = readSplit();
+      const towardEditor = (e.key === 'ArrowLeft') !== rtl; // LTR: left = smaller
+      let next: number | null = null;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        next = current + (towardEditor ? -1 : 1) * (SPLIT_STEP / 100);
+      } else if (e.key === 'Home') {
+        next = 0.5;
+      }
+      if (next === null) return;
+      e.preventDefault();
+      setSplit(next);
+    };
 
     divider.addEventListener('pointerdown', onPointerDown);
     divider.addEventListener('dblclick', onDblClick);
+    divider.addEventListener('keydown', onKeyDown);
     return () => {
       divider.removeEventListener('pointerdown', onPointerDown);
       divider.removeEventListener('dblclick', onDblClick);
+      divider.removeEventListener('keydown', onKeyDown);
     };
   }, []);
 
@@ -149,7 +202,7 @@ export default function Workspace({
       className={`${styles.workspace} ${styles[`mode${mode[0].toUpperCase()}${mode.slice(1)}`]}`}
       style={splitStyle}
     >
-      <section className={styles.editorPane} aria-label="Markdown editor">
+      <section className={styles.editorPane} aria-label={t('editor')}>
         <div className={styles.paneHead}>
           <span className={styles.paneLabel}>{t('editor')}</span>
           {docRenameable ? (
@@ -196,10 +249,18 @@ export default function Workspace({
         className={styles.divider}
         role="separator"
         aria-orientation="vertical"
-        title="Drag to resize · double-click to reset"
+        aria-label={t('dividerLabel')}
+        aria-valuemin={SPLIT_MIN * 100}
+        aria-valuemax={SPLIT_MAX * 100}
+        aria-valuenow={initialSplitPct}
+        /* a11y: a focusable separator IS interactive (APG splitter pattern —
+           it resizes by keyboard); the rule just doesn't model that role. */
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={0}
+        title={t('dividerTitle')}
       />
 
-      <section className={styles.previewPane} aria-label="Preview">
+      <section className={styles.previewPane} aria-label={t('preview')}>
         <div className={styles.paneHead}>
           <span className={styles.paneLabel}>{t('preview')}</span>
         </div>
