@@ -74,6 +74,16 @@ import type { PendingDiffView } from './pendingDiff';
 import { applyPendingDiff, createToolExecutor } from './executor';
 import { lineRangeOfOffset } from '../../lib/ai/tool-results';
 import {
+  canAttempt as canAttemptProvider,
+  loadingLabelFor,
+  planProvider,
+} from './providerResolution';
+import {
+  planApplyDiff,
+  planDiscardDiff,
+} from './diffResolution';
+import type { DiffResolutionRecord } from './diffResolution';
+import {
   appendSendPair,
   applyAgentText,
   applyAgentToolResult,
@@ -110,13 +120,6 @@ interface PendingSend {
 interface SelectionChipState {
   active: boolean;
   length: number;
-}
-
-/** Status label shown until the first streamed event of a run. */
-function loadingLabelFor(settings: ProviderSettings, tt: (key: string) => string): string {
-  if (settings.provider === 'builtin') return tt('aiStartingModel');
-  if (settings.provider === 'openai') return tt('aiConnectingOpenai');
-  return tt('aiConnectingAnthropic');
 }
 
 /** The chip's localized source hint ("lines 3–3 · Guide › Details"). */
@@ -291,7 +294,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
   const lastExternalRef = useRef<ChatProvider | null>(null);
   /** How the previous turn's proposed edit was resolved — fed to the next
    *  prompt so the model never re-proposes a discarded edit (spec §5.4). */
-  const resolutionRef = useRef<{ tool: string; resolution: 'applied' | 'discarded' } | null>(null);
+  const resolutionRef = useRef<DiffResolutionRecord | null>(null);
   const nextIdRef = useRef(1);
   const nextId = (): number => {
     const id = nextIdRef.current;
@@ -426,11 +429,12 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
   const resolveProvider = async (
     currentSettings: ProviderSettings,
   ): Promise<ChatProvider | null> => {
-    if (currentSettings.provider === 'builtin') {
-      if (!builtin.provider.supported) {
-        aiToast(tt('aiUnavailableExplainer'), 'error');
-        return null;
-      }
+    const plan = planProvider(currentSettings, { supported: builtin.provider.supported });
+    if (plan.action === 'refuse') {
+      aiToast(tt(plan.toastKey), 'error');
+      return null;
+    }
+    if (plan.action === 'builtin') {
       // The possibly-long LanguageModel.create() runs under the loading label.
       const session = await builtin.provider.ensureSession();
       if (!session) {
@@ -439,10 +443,6 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
         return null;
       }
       return builtin.provider;
-    }
-    if (!isExternalReady(currentSettings)) {
-      aiToast(tt('aiSettingsIncomplete'), 'error');
-      return null;
     }
     const provider = createExternalProvider(currentSettings);
     lastExternalRef.current = provider;
@@ -453,27 +453,31 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
    *  on the live document; line-anchored ones refuse when it moved. */
   const applyDiff = (assistantId: number, diff: PendingDiffView): void => {
     const result = applyPendingDiff(editor, diff, withEditorAccess);
-    if (result.applied) {
-      resolutionRef.current = { tool: diff.data.tool, resolution: 'applied' };
-      aiToast(tt('aiToolApplied'));
-    } else {
-      aiToast(tt('aiDiffChanged'), 'error');
-    }
+    const outcome = planApplyDiff(diff, result);
+    if (outcome.resolution) resolutionRef.current = outcome.resolution;
+    aiToast(tt(outcome.toastKey), outcome.toastKind);
     setMessages((prev) => settleDiff(
       prev,
       assistantId,
       diff.stepId,
       diff.id,
-      result.applied ? 'applied' : 'error',
+      outcome.settleStatus,
     ));
   };
 
   /** Discards one pending diff — reported back on the next send so the model
    *  never re-proposes blindly (spec §5.4). */
   const discardDiff = (assistantId: number, diff: PendingDiffView): void => {
-    resolutionRef.current = { tool: diff.data.tool, resolution: 'discarded' };
-    aiToast(tt('aiToolDiscarded'));
-    setMessages((prev) => settleDiff(prev, assistantId, diff.stepId, diff.id, 'discarded'));
+    const outcome = planDiscardDiff(diff);
+    resolutionRef.current = outcome.resolution;
+    aiToast(tt(outcome.toastKey), outcome.toastKind);
+    setMessages((prev) => settleDiff(
+      prev,
+      assistantId,
+      diff.stepId,
+      diff.id,
+      outcome.settleStatus,
+    ));
   };
 
   /** Runs one send end-to-end against the agent loop. */
@@ -651,9 +655,7 @@ export default function AiPanel({ editor, t, lang }: AiPanelProps) {
     }
   };
 
-  const canAttempt = settings.provider === 'builtin'
-    ? builtin.availability === 'available' || builtin.availability === 'downloadable'
-    : isExternalReady(settings);
+  const canAttempt = canAttemptProvider(settings, builtin.availability);
   const controlsDisabled = !canAttempt || busy;
 
   return (
