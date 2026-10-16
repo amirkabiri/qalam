@@ -8,7 +8,9 @@
 // after a document load) and the TOC scroll spy.
 //
 // Preview-selection → AI (this feature): a text selection inside the article
-// floats an accessible "Ask AI about this" affordance near the selection.
+// floats an accessible "Ask AI about this" affordance near the selection —
+// clipped to the article, so a selection that overshoots the document's end
+// (a drag past the last block) still floats for its article portion.
 // Activating it publishes { excerpt, sourceRange, headingPath } to the
 // features/ai handoff queue (previewExcerptQueue) — the panel adopts it as
 // visible composer context. The affordance never touches the selection
@@ -29,7 +31,7 @@ import type { ContentDir, Theme } from '../../lib/store';
 import { detectDir } from '../../lib/store';
 
 import { currentHeadingIndex } from './scrollSpy';
-import { rangeExcerptText, readPreviewSelection } from './selectionExcerpt';
+import { clipRangeToArticle, rangeExcerptText, readPreviewSelection } from './selectionExcerpt';
 import type { MarkdownPreviewState } from './useMarkdownPreview';
 
 import styles from './Preview.module.css';
@@ -181,20 +183,25 @@ export default function Preview({
         setAsk(null);
         return;
       }
-      const range = selection.getRangeAt(0);
-      if (!article.contains(range.commonAncestorContainer)) {
+      // Clip to the article first: a selection that starts (or ends) inside
+      // the article and overshoots past its boundary — dragging past the end
+      // of the document does exactly this — still floats the affordance for
+      // the article portion instead of vanishing on an out-of-article
+      // common ancestor.
+      const clipped = clipRangeToArticle(selection.getRangeAt(0), article);
+      if (!clipped) {
         setAsk(null);
         return;
       }
-      if (rangeExcerptText(range).trim() === '') {
+      if (rangeExcerptText(clipped).trim() === '') {
         setAsk(null);
         return;
       }
       // jsdom's Range has no client rects — the anchor degrades to a fixed
       // spot there (component tests assert presence/payload, not pixels);
       // real browsers get the selection's own rect.
-      const rect = typeof range.getBoundingClientRect === 'function'
-        ? range.getBoundingClientRect()
+      const rect = typeof clipped.getBoundingClientRect === 'function'
+        ? clipped.getBoundingClientRect()
         : null;
       const box = container.getBoundingClientRect();
       setAsk({
@@ -228,7 +235,14 @@ export default function Preview({
     const article = articleRef.current;
     const selection = document.getSelection();
     if (!article || !selection || selection.isCollapsed || selection.rangeCount === 0) return;
-    const payload = readPreviewSelection(article, selection.getRangeAt(0), state.source ?? '');
+    // Same clip as the tracker: the excerpt is the article portion of the
+    // selection, even when the raw range overshoots the article boundary.
+    const clipped = clipRangeToArticle(selection.getRangeAt(0), article);
+    if (!clipped) {
+      setAsk(null);
+      return;
+    }
+    const payload = readPreviewSelection(article, clipped, state.source ?? '');
     if (!payload) {
       setAsk(null);
       return;

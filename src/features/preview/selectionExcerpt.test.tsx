@@ -8,7 +8,7 @@ import {
 } from 'vitest';
 
 import { renderMarkdown } from '../../lib/markdown';
-import { readPreviewSelection } from './selectionExcerpt';
+import { clipRangeToArticle, rangeExcerptText, readPreviewSelection } from './selectionExcerpt';
 
 const SOURCE = [
   '# Guide',
@@ -138,5 +138,68 @@ describe('readPreviewSelection', () => {
 
     expect(result?.excerpt).toBe('Details');
     expect(result?.headingPath).toEqual(['Guide', 'Details']);
+  });
+});
+
+describe('clipRangeToArticle', () => {
+  it('returns a fully-inside range unchanged', () => {
+    const p = firstBlock('p');
+    const range = selectRange(p.firstChild as Node, 0, p.firstChild as Node, 7);
+
+    expect(clipRangeToArticle(range, article)).toBe(range);
+  });
+
+  it('clips a range that starts inside and ends past the article', () => {
+    const p = firstBlock('p');
+    const trailing = document.createElement('div');
+    trailing.textContent = 'out of article';
+    document.body.appendChild(trailing);
+
+    const range = document.createRange();
+    range.setStart(p.firstChild as Node, 0);
+    range.setEnd(document.body, document.body.childNodes.length);
+    const clipped = clipRangeToArticle(range, article);
+
+    expect(clipped).not.toBeNull();
+    expect(clipped && rangeExcerptText(clipped)).toContain('Closing paragraph.');
+    // The article-external tail is gone.
+    expect(clipped && rangeExcerptText(clipped)).not.toContain('out of article');
+  });
+
+  it('clips a range that starts before and ends inside the article', () => {
+    const leading = document.createElement('div');
+    leading.textContent = 'before the article';
+    document.body.insertBefore(leading, article);
+    const last = article.children[article.children.length - 1];
+
+    const range = document.createRange();
+    range.setStart(document.body, 0);
+    range.setEnd(last.firstChild as Node, (last.firstChild?.textContent ?? '').length);
+    const clipped = clipRangeToArticle(range, article);
+
+    expect(clipped && rangeExcerptText(clipped)).toContain('Guide');
+    expect(clipped && rangeExcerptText(clipped)).not.toContain('before the article');
+  });
+
+  it('returns the article range when the selection covers the whole article', () => {
+    const range = document.createRange();
+    range.setStart(document.body, 0);
+    range.setEnd(document.body, document.body.childNodes.length);
+
+    const clipped = clipRangeToArticle(range, article);
+
+    expect(clipped && rangeExcerptText(clipped)).toContain('Opening paragraph.');
+    expect(clipped && rangeExcerptText(clipped)).toContain('Closing paragraph.');
+  });
+
+  it('returns null when the range does not touch the article', () => {
+    const elsewhere = document.createElement('div');
+    elsewhere.textContent = 'unrelated';
+    document.body.appendChild(elsewhere);
+
+    const range = document.createRange();
+    range.selectNodeContents(elsewhere);
+
+    expect(clipRangeToArticle(range, article)).toBeNull();
   });
 });

@@ -67,13 +67,17 @@ test.describe('preview selection → AI', () => {
 
     // The first two text-rich paragraphs (early README paragraphs can be
     // badge images) and their real layout boxes — computed per engine AFTER
-    // the document settles. rich[0] is scrolled to the top of the preview so
-    // BOTH blocks sit inside the (720px-tall, headless) viewport: a drag
-    // endpoint below the fold makes the engine anchor a document-wide
-    // selection instead of the intended one. The drag starts on the leading
-    // edge of the first block and ends mid-way into the second, so the
-    // selection spans two blocks and both of their leading texts are
-    // guaranteed inside it.
+    // the document settles. rich[0] is scrolled to the top of the preview;
+    // in the current boot document the two rich paragraphs sit far apart
+    // (everything between them is list content), so the drag endpoint lands
+    // below the fold and the engine extends the selection past the article's
+    // end — the app clips the affordance's excerpt to the article, and both
+    // blocks' leading texts stay inside the selection. The drag STARTS on
+    // the first character's caret rect — NOT the block's corner: a centered
+    // or inline-leading paragraph (the boot doc opens with a bold word)
+    // leaves dead space at the block's leading edge, and a click there
+    // anchors after the inline element, dropping the block's first characters
+    // from the selection.
     const drag = await page.evaluate(() => {
       const article = document.querySelector('article');
       if (!article) throw new Error('preview article missing');
@@ -87,7 +91,20 @@ test.describe('preview selection → AI', () => {
           x: r.x, y: r.y, width: r.width, height: r.height,
         };
       };
-      const start = box(rich[0]);
+      // Caret rect at rich[0]'s very first TEXT position: the leading edge of
+      // its first rendered character, wherever centering/inline elements put
+      // it. The boundary must live inside a text node — a boundary before an
+      // inline element has an empty rect in some engines (0×0 at 0,0).
+      const walker = document.createTreeWalker(rich[0], NodeFilter.SHOW_TEXT);
+      const firstText = walker.nextNode();
+      if (!firstText) throw new Error('first rich paragraph has no text node');
+      const caret = document.createRange();
+      caret.setStart(firstText, 0);
+      caret.collapse(true);
+      const caretRect = caret.getBoundingClientRect();
+      const start: Box = {
+        x: caretRect.x, y: caretRect.y, width: 0, height: caretRect.height,
+      };
       const endBox = box(rich[1]);
       // The drag endpoint: horizontally centered, vertically in the upper
       // half of block 2 — and always inside the visible viewport.

@@ -508,6 +508,39 @@ describe('<Preview /> ask-AI affordance', () => {
     expect(screen.queryByRole('button', { name: 'Ask AI about this' })).not.toBeInTheDocument();
   });
 
+  it('floats the affordance for a selection that overshoots the article end (clipped excerpt)', () => {
+    const published: PreviewExcerptPayload[] = [];
+    const unsubscribe = previewExcerptQueue.subscribe((payload) => published.push(payload));
+    renderHarness({
+      state: makeState({ html: renderMarkdown(ASK_SOURCE).html, source: ASK_SOURCE }),
+    });
+
+    // A drag that runs past the end of the document: starts inside the first
+    // paragraph, ends on the container beyond the article's last block. The
+    // affordance must float for the article portion — not vanish because the
+    // raw range's common ancestor left the article.
+    const first = article().querySelector('p');
+    const container = article().parentElement as HTMLElement;
+    if (!first || !container) throw new Error('fixture missing');
+    const range = document.createRange();
+    range.setStart(first.firstChild as Node, 0);
+    range.setEnd(container, container.childNodes.length);
+    const selection = window.getSelection();
+    if (!selection) throw new Error('no selection API');
+    selection.removeAllRanges();
+    selection.addRange(range);
+    act(() => {
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask AI about this' }));
+
+    expect(published).toHaveLength(1);
+    // The excerpt is the article portion only — no out-of-article content.
+    expect(published[0]?.excerpt).toContain('First paragraph.');
+    unsubscribe();
+  });
+
   it('dismisses on Escape and returns focus to the preview scroll region', () => {
     renderHarness({
       state: makeState({ html: renderMarkdown(ASK_SOURCE).html, source: ASK_SOURCE }),

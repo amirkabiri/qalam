@@ -33,6 +33,37 @@ function blockText(el: Element): string {
   return clone.textContent ?? '';
 }
 
+/**
+ * Clips a selection range to the article's contents. A selection that starts
+ * (or ends) inside the article and overshoots past its boundary — a drag that
+ * runs past the end of the document is the common case — still represents
+ * article content the user meant to select; the affordance must float for the
+ * article portion, not vanish because the raw range's common ancestor landed
+ * outside. Returns the range unchanged when it is already fully inside, the
+ * article's own range when the selection covers it (select-all overshoot),
+ * the clipped overlap for partial overshoots, and null when the selection
+ * does not touch the article at all.
+ */
+export function clipRangeToArticle(range: Range, article: HTMLElement): Range | null {
+  const bounds = document.createRange();
+  bounds.selectNodeContents(article);
+  const startCmp = range.compareBoundaryPoints(Range.START_TO_START, bounds);
+  const endCmp = range.compareBoundaryPoints(Range.END_TO_END, bounds);
+  if (startCmp >= 0 && endCmp <= 0) return range; // fully inside — the common case
+  if (startCmp <= 0 && endCmp >= 0) return bounds; // covers the whole article
+  const clipped = document.createRange();
+  if (startCmp < 0) {
+    // Starts before the article, ends inside it.
+    clipped.setStart(bounds.startContainer, bounds.startOffset);
+    clipped.setEnd(range.endContainer, range.endOffset);
+  } else {
+    // Starts inside the article, ends past it.
+    clipped.setStart(range.startContainer, range.startOffset);
+    clipped.setEnd(bounds.endContainer, bounds.endOffset);
+  }
+  return clipped.collapsed ? null : clipped;
+}
+
 /** The article's top-level rendered blocks, as the pure mapper sees them. */
 export function readBlockUnits(article: HTMLElement): BlockUnit[] {
   return [...article.children].map((el) => {
