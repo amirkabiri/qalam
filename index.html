@@ -12,14 +12,14 @@
     - style-src keeps 'unsafe-inline': two inline element styles still need it —
       the Vite dev server injects <style> tags for HMR, and mermaid embeds
       <style> inside its SVGs at runtime. Production CSS itself ships as a
-      bundled <link> ('self'); once mermaid styling moves into bundled CSS,
-      'unsafe-inline' can be dropped from style-src entirely.
+      bundled <link> ('self'); the Vazirmatn font is SELF-HOSTED (the CDN
+      origins this policy once carried are gone — see src/styles/vazirmatn.css).
     - script-src 'self' is unchanged. `pnpm dev` alone relaxes it (React Fast
       Refresh injects an inline module preamble); see
       relaxCspForDevServer() in vite.config.ts. Production stays strict — the
       e2e boot spec asserts no console errors against this exact policy.
   -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src-attr 'unsafe-inline'; font-src https://cdn.jsdelivr.net; img-src * data:; media-src * data:; connect-src *; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src * data:; media-src * data:; connect-src *; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Qalam — collaborative Markdown editor</title>
   <meta name="description" content="Qalam (قلم): a collaborative Markdown editor where humans and AI write together — on-device AI (Gemini Nano) or your own OpenAI/Anthropic-compatible service. Persian/RTL-first, Mermaid diagrams, self-contained share links.">
@@ -28,10 +28,6 @@
 
   <!-- Pre-paint boot: restores theme/lang/dir from storage before first paint -->
   <script src="./boot.js"></script>
-
-  <!-- Persian UI font (falls through to it from the --sans token stack) -->
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/Vazirmatn-font-face.css" crossorigin="anonymous">
 </head>
 <body>
   <!-- React mounts here; ?file= / ?url= / #d= document loading is handled
