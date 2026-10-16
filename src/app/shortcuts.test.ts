@@ -466,13 +466,16 @@ describe('formatCombo', () => {
 });
 
 describe('README sync (single source of truth)', () => {
-  const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+  // The README shrank to a landing page (d259be0) and now points at
+  // docs/SHORTCUTS.md, which carries the binding tables the cheat sheet
+  // renders from — the drift contract moved there with it.
+  const readme = readFileSync(new URL('../../docs/SHORTCUTS.md', import.meta.url), 'utf8');
 
   it('documents every shortcut in BOTH the English and the Persian tables', () => {
     SHORTCUTS.forEach((def) => {
       const markup = formatMarkdownKbd(def.combo);
       const occurrences = readme.split(markup).length - 1;
-      expect(occurrences, `${def.id} (${markup}) should appear in README twice`).toBeGreaterThanOrEqual(2);
+      expect(occurrences, `${def.id} (${markup}) should appear in docs/SHORTCUTS.md twice`).toBeGreaterThanOrEqual(2);
     });
   });
 

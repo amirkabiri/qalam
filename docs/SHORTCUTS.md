@@ -204,3 +204,41 @@ Firefox:
   that disqualifies plain Mod+Alt+K**, Ctrl+Shift+J browser console,
   Ctrl+Alt+Shift+I browser toolbox — no ⌘⌥⇧K anywhere, Ctrl+Shift+M responsive
   mode)
+
+---
+
+# Appendix: current binding tables
+
+Rendered from the same `SHORTCUTS` table as the in-app cheat sheet (`src/app/shortcuts.ts`) — test-enforced so these cannot drift.
+
+## Shortcut reference (English)
+
+| Action | Keys |
+| --- | --- |
+| Open a document | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> |
+| New document | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> |
+| Copy link to this document | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> |
+| Toggle panel | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>&#92;</kbd> |
+| Toggle AI assistant | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> |
+| Editor only | <kbd>Alt</kbd>+<kbd>1</kbd> |
+| Split view | <kbd>Alt</kbd>+<kbd>2</kbd> |
+| Preview only | <kbd>Alt</kbd>+<kbd>3</kbd> |
+| Text direction (Auto / LTR / RTL) | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>X</kbd> |
+| Keyboard shortcuts | <kbd>?</kbd> |
+| Close panel or dialog | <kbd>Esc</kbd> |
+
+## Shortcut reference (فارسی)
+
+| عمل | کلیدها |
+| --- | --- |
+| باز کردن سند | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> |
+| سند جدید | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> |
+| کپی نشانی این سند | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> |
+| نمایش/بستن پنل | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>&#92;</kbd> |
+| نمایش/بستن دستیار هوشمند | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>A</kbd> |
+| فقط ویرایشگر | <kbd>Alt</kbd>+<kbd>1</kbd> |
+| نمای دو بخشی | <kbd>Alt</kbd>+<kbd>2</kbd> |
+| فقط پیش‌نمایش | <kbd>Alt</kbd>+<kbd>3</kbd> |
+| جهت متن (خودکار / چپ‌به‌راست / راست‌به‌چپ) | <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Alt</kbd>+<kbd>X</kbd> |
+| میان‌برهای صفحه‌کلید | <kbd>?</kbd> |
+| بستن پنل یا گفتگو | <kbd>Esc</kbd> |
