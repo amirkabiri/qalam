@@ -21,7 +21,7 @@
 - **Persian & RTL done right** — Vazirmatn font, per-paragraph direction auto-detection, mirrored bilingual UI (EN ⇄ FA), Persian digits, LTR-isolated inline code.
 - **Self-contained share links** — the whole document rides in the `#d=` URL fragment (deflate + base64url), which browsers never send to any server.
 - **Hardened, fully client-side** — DOMPurify-sanitized rendering, strict CSP with `script-src 'self'`, no CDN code at runtime.
-- **Tested in CI** — ~400 Vitest unit tests + 60 Playwright e2e runs across Chromium, Firefox and WebKit with axe-core accessibility scans, gating every push.
+- **MIT licensed** — free forever, self-hostable, your data never leaves the browser
 
 ## Quick Start
 
