@@ -7,6 +7,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Called by release.yml after semantic-release publishes a tag: the built-in
+  # GITHUB_TOKEN's own `release: published` event can't trigger workflows
+  # (GitHub ignores GITHUB_TOKEN-authored events), so the chain is explicit.
+  workflow_call:
   # The release workflow (release.yml) cuts a tag + GitHub Release on main;
   # redeploy so Pages always serves the released version.
   release:

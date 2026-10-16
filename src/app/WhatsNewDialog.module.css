@@ -1,0 +1,154 @@
+/* What's New dialog — mirrors the ShortcutsDialog overlay/skeleton (RAC
+   Modal + Dialog), with a release-list body instead of a shortcut table. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 20px 20px;
+  width: min(480px, 92vw);
+  max-height: min(560px, 86vh);
+  overflow-y: auto;
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  outline: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 8px;
+  /* The head must hug the padded dialog edges (dialog owns the scroll). */
+  margin: 0 -20px 0;
+  padding-inline: 20px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-elev);
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: var(--accent-soft);
+}
+
+.state {
+  margin: 18px 0 0;
+  color: var(--text-muted);
+}
+
+.stateText {
+  margin: 0 0 10px;
+}
+
+.retryBtn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.retryBtn:hover {
+  background: var(--accent-soft);
+}
+
+.list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.entry {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.entry:last-child {
+  border-bottom: none;
+}
+
+.entryHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.version {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+
+.entryTitle {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.entryTitle:hover {
+  text-decoration: underline;
+}
+
+.externalIcon {
+  display: inline-flex;
+  margin-inline-start: 4px;
+  color: var(--text-muted);
+  vertical-align: baseline;
+}
+
+.date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
+.items {
+  margin: 6px 0 0;
+  padding-inline-start: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.items li {
+  margin: 3px 0;
+}

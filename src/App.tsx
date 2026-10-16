@@ -20,6 +20,7 @@ import { previewDirFor, useMarkdownPreview } from './features/preview';
 import { copyShareLink } from './features/share';
 import Sidebar from './app/Sidebar';
 import ShortcutsDialog from './app/ShortcutsDialog';
+import WhatsNewDialog from './app/WhatsNewDialog';
 import Topbar from './app/Topbar';
 import Workspace from './app/Workspace';
 import { useGlobalShortcuts } from './app/useShortcuts';
@@ -94,6 +95,7 @@ function Shell({ lang, onToggleLang }: ShellProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
@@ -253,6 +255,7 @@ function Shell({ lang, onToggleLang }: ShellProps) {
         aiOpen={aiOpen}
         onToggleAi={() => setAiOpen((open) => !open)}
         onShortcuts={() => setShortcutsOpen(true)}
+        onWhatsNew={() => setWhatsNewOpen(true)}
         lang={lang}
         onToggleLang={onToggleLang}
         theme={theme}
@@ -298,6 +301,9 @@ function Shell({ lang, onToggleLang }: ShellProps) {
 
       {/* The `?` cheat sheet (also the topbar keyboard button). */}
       <ShortcutsDialog isOpen={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
+      {/* The "What's New" release changelog (topbar gift button). */}
+      <WhatsNewDialog isOpen={whatsNewOpen} onOpenChange={setWhatsNewOpen} lang={lang} />
       {dropOpen && (
         <div className={styles.dropOverlay} aria-hidden="true">
           <div className={styles.dropBox}>

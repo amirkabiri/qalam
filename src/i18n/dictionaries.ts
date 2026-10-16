@@ -170,6 +170,13 @@ export const dictionaries: Record<Lang, Dictionary> = {
     shortcutsCloseLayer: 'Close panel or dialog',
     shortcutsGroupView: 'View',
     shortcutsGroupGeneral: 'General',
+    // app/whatsNew (What's New changelog dialog)
+    whatsNew: "What's new",
+    whatsNewLoading: 'Loading the latest changes…',
+    whatsNewError: "Couldn't load the changelog from GitHub.",
+    whatsNewRetry: 'Retry',
+    whatsNewEmpty: 'No releases yet.',
+    whatsNewCommits: 'Recent commits',
     toggleAiPanel: 'Toggle AI assistant',
     // a11y (skip link)
     skipToContent: 'Skip to content',
@@ -331,6 +338,13 @@ export const dictionaries: Record<Lang, Dictionary> = {
     shortcutsCloseLayer: 'بستن پنل یا گفتگو',
     shortcutsGroupView: 'نما',
     shortcutsGroupGeneral: 'عمومی',
+    // app/whatsNew (What's New changelog dialog)
+    whatsNew: 'چه چیزهایی تازه است',
+    whatsNewLoading: 'در حال بارگیری آخرین تغییرات…',
+    whatsNewError: 'دریافت تغییرات از گیت‌هاب ممکن نشد.',
+    whatsNewRetry: 'تلاش دوباره',
+    whatsNewEmpty: 'هنوز نسخه‌ای منتشر نشده است.',
+    whatsNewCommits: 'کامیت‌های اخیر',
     toggleAiPanel: 'نمایش/بستن دستیار هوشمند',
     // a11y (skip link)
     skipToContent: 'پرش به محتوا',

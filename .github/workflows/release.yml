@@ -1,8 +1,9 @@
 # Automatic releases on every push to main: Conventional Commits drive the
 # semver bump; a release (tag + GitHub Release + CHANGELOG.md) is cut only
-# when the new commits contain a feat/fix. The `release: published` event
-# re-runs the Pages deploy so the deployed app always matches the latest
-# release (see deploy.yml).
+# when the new commits contain a feat/fix. When a release lands, the Pages
+# deploy job is called directly below — a `release: published` trigger can't
+# do this job because the release is authored with the built-in GITHUB_TOKEN
+# and GitHub never fires downstream workflows for GITHUB_TOKEN events.
 name: Release
 
 on:
@@ -18,11 +19,16 @@ concurrency:
 permissions:
   contents: write # tags + releases + the chore(release) commit
   issues: write # semantic-release failure/issue comments
+  pages: write # needed by the chained deploy job
+  id-token: write
 
 jobs:
   release:
     name: Semantic release
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.published.outputs.published }}
+      version: ${{ steps.published.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,3 +54,24 @@ jobs:
           GIT_COMMITTER_NAME: qalam-release-bot
           GIT_COMMITTER_EMAIL: qalam-release-bot@users.noreply.github.com
         run: pnpm exec semantic-release
+
+      # semantic-release (CLI) doesn't expose "was a release published" as a
+      # step output; detect it by whether a v* tag now points at origin/main
+      # (the release commit is tagged, so this is exact, not heuristic).
+      - id: published
+        name: Detect published release
+        run: |
+          git fetch origin main --tags --force
+          tag="$(git tag --points-at FETCH_HEAD | head -n1)"
+          if [ -n "$tag" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Deploy the released version to GitHub Pages (reuses deploy.yml's job).
+  deploy:
+    name: Deploy released version
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
